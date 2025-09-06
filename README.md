@@ -1,2 +1,2 @@
 # ALHO
-Autoencoder-driven Learning against Hostile Online
+Autoencoder-driven Learning against Hostile phishing URLs
