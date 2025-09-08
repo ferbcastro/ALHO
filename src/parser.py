@@ -1,7 +1,9 @@
 import pandas as pd
 
 gramSize = 4
+http = "http://"
 httpFreq = 0
+https = "https://"
 httpsFreq = 0
 freqs = {}
 
@@ -17,20 +19,23 @@ def IsInDict(key):
 def IncDictEntry(key):
     global freqs
     freqs[key] += 1
-    return
+
+def RemovePrefix(prefix, string):
+    strTmp = string[0 : len(prefix)]
+    idx = strTmp.find(prefix)
+    if idx != -1:
+        string = string[idx + len(string) :]
+    return idx != -1
 
 def CreateDict(url):
     global httpFreq
     global httpsFreq
-    idx = url.find("http://")
-    if idx != -1:
-        httpFreq += 1
-        url = url[idx + len('http://') :]
+
+    if RemovePrefix(https, url) == False:
+        if RemovePrefix(http, url) == True:
+            httpFreq += 1
     else:
-        idx = url.find("https://")
-        if idx != -1:
-            httpsFreq += 1
-            url = url[idx + len('https://') :]
+        httpsFreq += 1
     urlSize = len(url)
 
     if urlSize < gramSize:
