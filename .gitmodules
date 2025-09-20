@@ -1,0 +1,3 @@
+[submodule "pacu-dataset"]
+	path = pacu-dataset
+	url = git@github.com:pacutil/pacu-dataset.git
