@@ -36,10 +36,14 @@ def bigram_dist(url: str) -> Tuple[List[float], List[int]]:
 
 def process_row(row: pd.Series) -> pd.Series:
     url = row["url"]
+    features = {
+            "url"   : row["url"],
+            "label" : row["label"]
+            }
+
     url_s = strip_url(url)
     bigram_presence = bigram_dist(url_s)
-
-    features ={"label" : row["label"]}
+    
     for i, j in enumerate(bigram_presence):
         idx1 = i // _CHAR_SPACE_LEN
         idx2 = i % _CHAR_SPACE_LEN
