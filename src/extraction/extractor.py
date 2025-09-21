@@ -1,4 +1,4 @@
-from src.extraction.features import extract_features
+from extraction.features import extract_features
 from multiprocessing import Pool, cpu_count
 
 import pandas as pd
