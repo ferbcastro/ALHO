@@ -9,9 +9,10 @@ class FeatureExtractor:
 
     df: pd.DataFrame
 
-    def __init__(self, path: str) -> None:
-        self.df = pd.read_csv(path)
-
+    def __init__(self, paths) -> None:
+        for path in paths:
+            tmp = pd.read_csv(path)
+            self.df = self.df.merge(tmp, on=["url", "label"], how="inner")
 
     def extract(self) -> None:
 
