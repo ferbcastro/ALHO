@@ -10,6 +10,3 @@ print("extracting...")
 ex.extract()
 print("exporting...")
 ex.export("out.csv")
-
-
-

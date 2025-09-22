@@ -20,13 +20,11 @@ def strip_url(url: str) -> str:
 
     return url
 
-# distribution_unit = 1/(len(url)-1)
-def bigram_dist(url: str) -> Tuple[List[float], List[int]]:
+def ngram_extract(url: str) -> List[int]:
 
     url_len = len(url)
     total_bigrams = url_len - 1
     bigram_presence = [0] * (_CHAR_SPACE_LEN**2)
-    distribution_unit = 1/total_bigrams
 
     for i in range(total_bigrams):
         idx = _CHAR_INDEX[url[i]] * _CHAR_SPACE_LEN + _CHAR_INDEX[url[i + 1]]
@@ -43,7 +41,7 @@ def process_row(row: pd.Series) -> pd.Series:
 
     url_s = strip_url(url)
     bigram_presence = bigram_dist(url_s)
-    
+
     for i, j in enumerate(bigram_presence):
         idx1 = i // _CHAR_SPACE_LEN
         idx2 = i % _CHAR_SPACE_LEN
