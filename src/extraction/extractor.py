@@ -65,7 +65,7 @@ class PartiaNGramExtractor:
     num_selected_grams = 0
     num_phishing = 0
     num_not_phishing = 0
-    grams_selected = False
+    selection_done = False
 
     def __init__(self, paths, gram_size, requested_grams, threshold) -> None:
         self.fe = FeatureExtractor(paths)
@@ -90,7 +90,7 @@ class PartiaNGramExtractor:
         self.fe.export(path)
 
     def _prep(self, chunks, num_chunks) -> None:
-        if self.grams_selected == True:
+        if self.selection_done == True:
             return
 
         with Pool(num_chunks) as pool:
@@ -101,6 +101,7 @@ class PartiaNGramExtractor:
         iterator = total_grams_dict.items()
         sorted_grams_list = sorted(iterator, lambda it : it[1][0], reverse=True)
         self._select_features(sorted_grams_list)
+        self.selection_done = True
 
     def _build_dictionary(df: pd.DataFrame) -> dict[str : tuple[int, int]]:
         dct: dict[str : tuple[int : list[int]]]
