@@ -56,7 +56,7 @@ df = pd.read_csv("./dataset/bb.csv/brasilia.csv",
                 usecols = ['url'],
                 encoding = 'utf-8')
 
-df.apply(lambda line : line.map(CreateDict), axis = 1)
+df.apply(lambda row : row.map(CreateDict), axis = 1)
 
 cont = 0
 cols = []
