@@ -26,7 +26,7 @@ class FeatureExtractor:
         df['url'] = df['url'].apply(self._strip_url)
         org_df = df
 
-    def extract(self, extraction_func) -> None:
+    def extract(self, prep_func, extraction_func) -> None:
         n_procs = cpu_count()
         chunk_size = math.ceil(self.org_df.shape[0] / n_procs)
         chunks = []
@@ -37,7 +37,11 @@ class FeatureExtractor:
             df_chunk = self.org_df.iloc[start_index:end_index]
             chunks.append(df_chunk)
 
-        extraction_func(chunks, num_chunks)
+        if prep_func:
+            prep_func(chunks, n_procs) # any preprocessing needed
+        with Pool(n_procs) as pool:
+            results = pool.map(extraction_func, chunks)
+        self.mod_df = pd.concat(results, ignore_index=True)
 
     def export(self, path: str) -> None:
         self.mod_df.to_csv(path, index=False)
@@ -80,25 +84,23 @@ class PartiaNGramExtractor:
             self.threshold = threshold
 
     def extract(self) -> None:
-        self.fe.extract(self._extract)
+        self.fe.extract(self._prep, self._extract_features)
 
     def export(self, path: str) -> None:
         self.fe.export(path)
 
-    def _extract(self, chunks, num_chunks) -> None:
-        if self.grams_selected == False:
-            with Pool(num_chunks) as pool:
-                results = pool.map(self._build_dictionary, chunks)
-            total_grams_dict = {:}
-            for d in results:
-                total_grams_dict |= d
-            iterator = total_grams_dict.items()
-            sorted_grams_list = sorted(iterator, lambda it : it[1][0], reverse=True)
-            self._select_features(sorted_grams_list)
+    def _prep(self, chunks, num_chunks) -> None:
+        if self.grams_selected == True:
+            return
 
         with Pool(num_chunks) as pool:
-            results = pool.map(self._extract_features, chunks)
-        self.fe.mod_df = pd.concat(results, ignore_index=True)
+            results = pool.map(self._build_dictionary, chunks)
+        total_grams_dict = {:}
+        for d in results:
+            total_grams_dict |= d
+        iterator = total_grams_dict.items()
+        sorted_grams_list = sorted(iterator, lambda it : it[1][0], reverse=True)
+        self._select_features(sorted_grams_list)
 
     def _build_dictionary(df: pd.DataFrame) -> dict[str : tuple[int, int]]:
         dct: dict[str : tuple[int : list[int]]]
@@ -191,15 +193,10 @@ class BigramExtractor:
         self.fe = FeatureExtractor(paths)
 
     def extract(self) -> None:
-        self.fe.extract(self._extract)
+        self.fe.extract(None, self._extract_features)
 
     def export(self, path: str) -> None:
         self.fe.export(path)
-
-    def _extract(self, chunks, num_chunks) -> None:
-        with Pool(num_chunks) as pool:
-            results = pool.map(self._extract_features, chunks)
-        self.fe.mod_df = pd.concat(results, ignore_index=True)
 
     def _extract_features(df: pd.DataFrame) -> pd.DataFrame:
         return df.apply(self._process_row, axis=1)
