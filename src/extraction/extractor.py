@@ -89,6 +89,10 @@ class FlexibleGramExtractor:
     def export(self, path: str) -> None:
         self.fe.export(path)
 
+    def statistics(self) -> None:
+        print(f'Number of selected grams [{}]', self.num_selected_grams)
+        print(f'Threshold set to [{}]', self.threshold)
+
     def _prep(self, chunks, num_chunks) -> None:
         if self.selection_done == True:
             return
@@ -185,6 +189,8 @@ class FlexibleGramExtractor:
         for i, j in enumerate(ngram_presence):
             big = self.grams_space[i]
             features.update({big:j})
+
+        return pd.Series(features)
 
     def _ngram_extract(url: str) -> List[int]:
         presence = [0] * self.num_selected_grams
