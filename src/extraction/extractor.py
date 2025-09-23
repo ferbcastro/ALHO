@@ -60,12 +60,11 @@ class FlexibleGramExtractor:
     requested_grams: int
     gram_size: int
     threshold: float
-    grams_space = []
-    grams_index = {:}
-    num_selected_grams = 0
-    num_phishing = 0
-    num_not_phishing = 0
-    selection_done = False
+    gram_space: set
+    num_selected_grams: int
+    num_not_phishing: int
+    num_phishing: int
+    selection_done: bool
 
     def __init__(self, paths, gram_size, requested_grams, threshold) -> None:
         self.fe = FeatureExtractor(paths)
@@ -73,15 +72,18 @@ class FlexibleGramExtractor:
         max_grams = fe.char_space_len ** gram_size
         if requested_grams > max_grams:
             self.requested_grams = max_grams
-            print(f'requested_grams set to {}', self.requested_grams)
+            print(f'requested_grams set to {num}', self.requested_grams)
         else:
             self.requested_grams = requested_grams
 
         if threshold < 0 or threshold > 1:
             self.threshold = 0.5
-            print(f'threshold set to {}', self.threshold)
-        else
+            print(f'threshold set to {num}', self.threshold)
+        else:
             self.threshold = threshold
+
+        self.num_selected_grams = self.num_not_phishing = self.num_phishing = 0
+        self.selection_done = False
 
     def extract(self) -> None:
         self.fe.extract(self._prep, self._extract_features)
@@ -90,8 +92,8 @@ class FlexibleGramExtractor:
         self.fe.export(path)
 
     def statistics(self) -> None:
-        print(f'Number of selected grams [{}]', self.num_selected_grams)
-        print(f'Threshold set to [{}]', self.threshold)
+        print(f'Number of selected grams [{num}]', self.num_selected_grams)
+        print(f'Threshold set to [{num}]', self.threshold)
 
     def _prep(self, chunks, num_chunks) -> None:
         if self.selection_done == True:
@@ -100,7 +102,7 @@ class FlexibleGramExtractor:
         with Pool(num_chunks) as pool:
             results = pool.map(self._build_dictionary, chunks)
 
-        total_grams_dict = {:}
+        total_grams_dict = dict()
         for d in results:
             self._merge_dict(total_grams_dict, d)
 
@@ -110,7 +112,7 @@ class FlexibleGramExtractor:
         self.selection_done = True
 
     def _build_dictionary(df: pd.DataFrame) -> dict[str : tuple[int, int]]:
-        dct = {:}
+        dct = dict()
         df.apply(lambda row : self._build_dict_process_row(row, dct), axis = 1)
         return dct
 
@@ -168,9 +170,8 @@ class FlexibleGramExtractor:
                 not_present_phishing
             ))
 
-            if res >= self.threshold
-                self.grams_index.update({res : self.num_selected_grams})
-                self.grams_space.append(res)
+            if res >= self.threshold:
+                self.gram_space.add(elem)
                 self.num_selected_grams += 1
                 if self.num_selected_grams == self.requested_grams:
                     break
@@ -185,25 +186,16 @@ class FlexibleGramExtractor:
                 "label" : row["label"]
                 }
 
-        ngram_presence = self._ngram_extract(url)
-        for i, j in enumerate(ngram_presence):
-            big = self.grams_space[i]
-            features.update({big:j})
+        for elem in self.gram_space:
+            features.update({elem:0})
+        url_len = len(url)
+        if url_len >= self.gram_size:
+            for i in range(url_len - self.gram_size):
+                key = url[i : i + self.gram_size]
+                if key in self.gram_space:
+                    features[key] = 1
 
         return pd.Series(features)
-
-    def _ngram_extract(url: str) -> List[int]:
-        presence = [0] * self.num_selected_grams
-        url_len = len(url)
-        if url_len < self.gram_size:
-            return presence
-
-        for i in range(url_len - gram_size):
-            sub = url[i : i + self.gram_size]
-            if sub in grams_index:
-                presence[grams_index[sub]] = 1
-
-        return presence
 
 class BigramExtractor:
     fe: FeatureExtractor
@@ -244,7 +236,7 @@ class BigramExtractor:
         presence = [0] * (self.char_space_len**2)
 
         for i in range(total_bigrams):
-            idx = self.char_index[url[i]] * char_space_len +
-                    self.char_index[url[i + 1]]
+            idx = self.char_index[url[i]] * char_space_len + \
+                self.char_index[url[i + 1]]
             presence[idx] = 1
 
