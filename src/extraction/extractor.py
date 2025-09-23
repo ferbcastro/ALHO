@@ -95,16 +95,18 @@ class FlexibleGramExtractor:
 
         with Pool(num_chunks) as pool:
             results = pool.map(self._build_dictionary, chunks)
+
         total_grams_dict = {:}
         for d in results:
-            total_grams_dict |= d
-        iterator = total_grams_dict.items()
-        sorted_grams_list = sorted(iterator, lambda it : it[1][0], reverse=True)
+            self._merge_dict(total_grams_dict, d)
+
+        view = total_grams_dict.items()
+        sorted_grams_list = sorted(view, lambda it : it[1][0], reverse=True)
         self._select_features(sorted_grams_list)
         self.selection_done = True
 
     def _build_dictionary(df: pd.DataFrame) -> dict[str : tuple[int, int]]:
-        dct: dict[str : tuple[int : list[int]]]
+        dct = {:}
         df.apply(lambda row : self._build_dict_process_row(row, dct), axis = 1)
         return dct
 
@@ -127,6 +129,17 @@ class FlexibleGramExtractor:
                 self.num_not_phishing += 1
             else:
                 self.num_phishing += 1
+
+    # merge in dct1
+    def _merge_dict(
+        dct1: dict[str, tuple[int, int]],
+        dct2: dict[str, tuple[int, int]]
+    ):
+        for k, v in dct2.items():
+            if k in dct1:
+                dct1[k] = tuple(a + b for a, b in zip(dct1[k], v))
+            else:
+                dct1[k] = v
 
     # ranges from -1 to 1. 0 indicates no correlation.
     def _calc_mcc(tp, tn, fp, fn):
