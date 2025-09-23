@@ -55,7 +55,7 @@ class FeatureExtractor:
 
         return url
 
-class PartiaNGramExtractor:
+class FlexibleGramExtractor:
     fe: FeatureExtractor
     requested_grams: int
     gram_size: int
