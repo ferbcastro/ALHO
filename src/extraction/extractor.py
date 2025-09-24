@@ -7,13 +7,13 @@ import math
 import sys
 import re
 
+CHAR_SPACE = string.printable[:-6] # printable characters except whitespaces
+CHAR_SPACE_LEN = len(CHAR_SPACE)
+CHAR_INDEX = {c: i for i, c in enumerate(CHAR_SPACE)}
+
 class FeatureExtractor:
     org_df: pd.DataFrame
     mod_df: pd.DataFrame
-
-    char_space = string.printable[:-6] # printable characters except whitespaces
-    char_space_len = len(char_space)
-    char_index = {c: i for i, c in enumerate(char_space)}
 
     def __init__(self, paths) -> None:
         df1 = pd.read_csv(paths[0])
@@ -48,33 +48,37 @@ class FeatureExtractor:
 
     # Strip scheme and characters outside CHAR_SPACE
     def _strip_url(self, url: str) -> str:
-        url = "".join(char for char in url if char in self.char_space)
+        url = "".join(char for char in url if char in CHAR_SPACE)
 
         if (scheme := urlparse(url).scheme):
             url = re.sub(f"^{scheme}://", "", url)
 
         return url
 
-class FlexibleGramExtractor:
-    fe: FeatureExtractor
-    requested_grams: int
-    gram_size: int
-    threshold: float
-    gram_space: set
-    num_selected_grams: int
+class FeatureSelector:
     num_not_phishing: int
     num_phishing: int
-    selection_done: bool
+    requested: int
+    gram_size: int
+    threshold: float
+    selected: int
+    space: set
 
-    def __init__(self, paths, gram_size, requested_grams, threshold) -> None:
-        self.fe = FeatureExtractor(paths)
-
-        max_grams = fe.char_space_len ** gram_size
-        if requested_grams > max_grams:
-            self.requested_grams = max_grams
-            print(f'requested_grams set to {num}', self.requested_grams)
+    def __init__(self, gram_size, requested_grams, threshold) -> None:
+        self.space = {}
+        self.selected = self.num_not_phishing = self.num_phishing = 0
+        if gram_size < 0:
+            self.gram_size = 2
+            print(f'gram_size set to [{size}]', self.gram_size)
         else:
-            self.requested_grams = requested_grams
+            self.gram_size = gram_size
+
+        max_grams = CHAR_SPACE_LEN ** self.gram_size
+        if requested_grams > max_grams:
+            self.requested = max_grams
+            print(f'requested_grams set to {num}', self.requested)
+        else:
+            self.requested = requested_grams
 
         if threshold < 0 or threshold > 1:
             self.threshold = 0.5
@@ -82,23 +86,7 @@ class FlexibleGramExtractor:
         else:
             self.threshold = threshold
 
-        self.num_selected_grams = self.num_not_phishing = self.num_phishing = 0
-        self.selection_done = False
-
-    def extract(self) -> None:
-        self.fe.extract(self._prep, self._extract_features)
-
-    def export(self, path: str) -> None:
-        self.fe.export(path)
-
-    def statistics(self) -> None:
-        print(f'Number of selected grams [{num}]', self.num_selected_grams)
-        print(f'Threshold set to [{num}]', self.threshold)
-
-    def _prep(self, chunks, num_chunks) -> None:
-        if self.selection_done == True:
-            return
-
+    def select(self, chunks, num_chunks) -> {}:
         with Pool(num_chunks) as pool:
             results = pool.map(self._build_dictionary, chunks)
 
@@ -109,14 +97,18 @@ class FlexibleGramExtractor:
         view = total_grams_dict.items()
         sorted_grams_list = sorted(view, lambda it : it[1][0], reverse=True)
         self._select_features(sorted_grams_list)
-        self.selection_done = True
+        return self.space.copy()
 
-    def _build_dictionary(df: pd.DataFrame) -> dict[str : tuple[int, int]]:
+    def statistics(self) -> None:
+        print(f'Number of selected grams [{num}]', self.selected)
+        print(f'Threshold set to [{num}]', self.threshold)
+
+    def _build_dictionary(self, df: pd.DataFrame) -> dict[str : tuple[int, int]]:
         dct = dict()
         df.apply(lambda row : self._build_dict_process_row(row, dct), axis = 1)
         return dct
 
-    def _build_dict_process_row(row: pd.Series, dct) -> None:
+    def _build_dict_process_row(self, row: pd.Series, dct) -> None:
         url = row['url']
         label = row['label']
         url_len = len(url)
@@ -138,6 +130,7 @@ class FlexibleGramExtractor:
 
     # merge in dct1
     def _merge_dict(
+        self,
         dct1: dict[str, tuple[int, int]],
         dct2: dict[str, tuple[int, int]]
     ):
@@ -148,10 +141,10 @@ class FlexibleGramExtractor:
                 dct1[k] = v
 
     # ranges from -1 to 1. 0 indicates no correlation.
-    def _calc_mcc(tp, tn, fp, fn):
+    def _calc_mcc(self, tp, tn, fp, fn):
         return (tp*tn - fp*fn) / (((tp+fp)(tp+fn)(tn+fp)(tn+fn)) ** .5)
 
-    def _select_features(grams: list) -> None:
+    def _select_features(self, grams: list) -> None:
         for elem in grams:
             total = elem[1][0]
             # false positive
@@ -171,15 +164,38 @@ class FlexibleGramExtractor:
             ))
 
             if res >= self.threshold:
-                self.gram_space.add(elem)
-                self.num_selected_grams += 1
-                if self.num_selected_grams == self.requested_grams:
+                self.space.add(elem)
+                self.selected += 1
+                if self.selected == self.requested:
                     break
 
-    def _extract_features(df: pd.DataFrame) -> pd.DataFrame:
+
+class FlexibleGramExtractor:
+    fe: FeatureExtractor
+    fs: FeatureSelector
+    selection_done: bool
+    gram_space: set
+
+    def __init__(self, paths, gram_size, requested_grams, threshold) -> None:
+        self.fe = FeatureExtractor(paths)
+        self.fs = FeatureSelector(gram_size, requested_grams, threshold)
+        self.selection_done = False
+
+    def extract(self) -> None:
+        self.fe.extract(self._prep, self._extract_features)
+
+    def export(self, path: str) -> None:
+        self.fe.export(path)
+
+    def _prep(self, chunks, num_chunks) -> None:
+        if self.selection_done == False:
+            self.gram_space = self.fs.select(chunks, num_chunks)
+            self.selection_done = True
+
+    def _extract_features(self, df: pd.DataFrame) -> pd.DataFrame:
         return df.apply(_process_row, axis=1)
 
-    def _process_row(row: pd.Series) -> pd.Series:
+    def _process_row(self, row: pd.Series) -> pd.Series:
         url = row["url"]
         features = {
                 "url"   : row["url"],
@@ -210,10 +226,10 @@ class BigramExtractor:
     def export(self, path: str) -> None:
         self.fe.export(path)
 
-    def _extract_features(df: pd.DataFrame) -> pd.DataFrame:
+    def _extract_features(self, df: pd.DataFrame) -> pd.DataFrame:
         return df.apply(self._process_row, axis=1)
 
-    def _process_row(row: pd.Series) -> pd.Series:
+    def _process_row(self, row: pd.Series) -> pd.Series:
         url = row["url"]
         features = {
                 "url"   : row["url"],
@@ -223,20 +239,19 @@ class BigramExtractor:
         bigram_presence = self._bigram_extract(url)
 
         for i, j in enumerate(bigram_presence):
-            idx1 = i // self.fe.char_space_len
-            idx2 = i % self.fe.char_space_len
-            big = self.fe.char_space[idx1] + self.fe.char_space[idx2]
+            idx1 = i // CHAR_SPACE_LEN
+            idx2 = i % CHAR_SPACE_LEN
+            big = CHAR_SPACE[idx1] + CHAR_SPACE[idx2]
             features.update({big:j})
 
         return pd.Series(features)
 
-    def _bigram_extract(url: str) -> List[int]:
+    def _bigram_extract(self, url: str) -> List[int]:
         url_len = len(url)
         total_bigrams = url_len - 1
-        presence = [0] * (self.char_space_len**2)
+        presence = [0] * (self.CHAR_SPACE_LEN**2)
 
         for i in range(total_bigrams):
-            idx = self.char_index[url[i]] * char_space_len + \
-                self.char_index[url[i + 1]]
+            idx = CHAR_INDEX[url[i]] * CHAR_SPACE_LEN + CHAR_INDEX[url[i + 1]]
             presence[idx] = 1
 
