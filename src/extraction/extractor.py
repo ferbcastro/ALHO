@@ -64,27 +64,13 @@ class FeatureSelector:
     selected: int
     space: set
 
-    def __init__(self, gram_size, requested_grams, threshold) -> None:
+    def __init__(self, gram_size, requested, threshold) -> None:
         self.space = {}
         self.selected = self.num_not_phishing = self.num_phishing = 0
-        if gram_size < 0:
-            self.gram_size = 2
-            print(f'gram_size set to [{size}]', self.gram_size)
-        else:
-            self.gram_size = gram_size
-
-        max_grams = CHAR_SPACE_LEN ** self.gram_size
-        if requested_grams > max_grams:
-            self.requested = max_grams
-            print(f'requested_grams set to {num}', self.requested)
-        else:
-            self.requested = requested_grams
-
-        if threshold < 0 or threshold > 1:
-            self.threshold = 0.5
-            print(f'threshold set to {num}', self.threshold)
-        else:
-            self.threshold = threshold
+        assert gram_size > 0
+        max_f = CHAR_SPACE_LEN ** self.gram_size
+        assert requested <= max_f
+        assert threshold > 0 and threshold < 1
 
     def select(self, chunks, num_chunks) -> {}:
         with Pool(num_chunks) as pool:
