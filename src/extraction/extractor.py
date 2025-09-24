@@ -235,7 +235,7 @@ class BigramExtractor:
     def _bigram_extract(self, url: str) -> List[int]:
         url_len = len(url)
         total_bigrams = url_len - 1
-        presence = [0] * (self.CHAR_SPACE_LEN**2)
+        presence = [0] * (CHAR_SPACE_LEN**2)
 
         for i in range(total_bigrams):
             idx = CHAR_INDEX[url[i]] * CHAR_SPACE_LEN + CHAR_INDEX[url[i + 1]]
