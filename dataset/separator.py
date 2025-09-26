@@ -40,12 +40,8 @@ n_min = min(len(phishing), len(legit))
 print(f"Contagens originais -> phishing: {len(phishing)}, legitimas: {len(legit)}")
 print(f"Balanceando usando n = {n_min}.")
 
-if len(phishing) <= len(legit):
-    phishing_sample = phishing.sample(n=n_min, random_state=RANDOM_STATE)
-    legit_sample = legit.sample(n=n_min, random_state=RANDOM_STATE)
-else:
-    legit_sample = legit.sample(n=n_min, random_state=RANDOM_STATE)
-    phishing_sample = phishing.sample(n=n_min, random_state=RANDOM_STATE)
+phishing_sample = phishing.sample(n=n_min, random_state=RANDOM_STATE)
+legit_sample = legit.sample(n=n_min, random_state=RANDOM_STATE)
 
 df_balanced = pd.concat([phishing_sample, legit_sample], ignore_index=True)
 df_balanced = df_balanced.sample(frac=1, random_state=RANDOM_STATE).reset_index(drop=True)
