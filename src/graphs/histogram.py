@@ -1,6 +1,8 @@
 """Module to implement a Histogram"""
+# External libs
 import matplotlib.pyplot as plt
 
+# Internal modules
 from graphs.graph import Graph
 
 

@@ -1,8 +1,10 @@
 """Module to serve as basic implementation for graphs"""
 
+#External libs
 import matplotlib.pyplot as plt
 
 class Graph():
+
     def __init__(
         self, 
         title: str,

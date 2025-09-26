@@ -1,8 +1,11 @@
 """Module to implement a Bar Graph"""
 
+# External libs
+import matplotlib.pyplot as plt
+
+# Internal modules
 from graphs.graph import Graph
 
-import matplotlib.pyplot as plt
 
 class BarGraph(Graph):
     """Simple implementation of a bar graph"""

@@ -1,6 +1,11 @@
+"""Module to show a comparison between graphs"""
+
+# External libs
+import matplotlib.pyplot as plt
+
+# Internal modules
 from graphs.graph import Graph
 
-import matplotlib.pyplot as plt
 
 class Comparison():
 
@@ -9,6 +14,7 @@ class Comparison():
         self.columns = columns
 
     def render(self, graphs:list[Graph]):
+        """Render a comparison between graphs"""
 
         for index in range(len(graphs)):
             plt.subplot(self.rows, self.columns, index+1)
