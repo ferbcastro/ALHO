@@ -11,6 +11,18 @@ CHAR_SPACE = string.printable[:-6] # printable characters except whitespaces
 CHAR_SPACE_LEN = len(CHAR_SPACE)
 CHAR_INDEX = {c: i for i, c in enumerate(CHAR_SPACE)}
 
+
+def split(df : pd.DataFrame) -> list, int:
+    n_procs = cpu_count()
+    chunk_size = math.ceil(self.org_df.shape[0] / n_procs)
+    chunks = []
+    for i in range(n_procs):
+        start_index = i * chunk_size
+        end_index = (i + 1) * chunk_size
+        df_chunk = self.org_df.iloc[start_index:end_index]
+        chunks.append(df_chunk)
+    return chunks, n_procs
+
 class FeatureExtractor:
     org_df: pd.DataFrame
     mod_df: pd.DataFrame
@@ -24,22 +36,13 @@ class FeatureExtractor:
 
         df = pd.concat(frames, ignore_index=True)
         df['url'] = df['url'].apply(self._strip_url)
-        org_df = df
+        org_df = mod_df = df
 
     def extract(self, prep_func, extraction_func) -> None:
-        n_procs = cpu_count()
-        chunk_size = math.ceil(self.org_df.shape[0] / n_procs)
-        chunks = []
-
-        for i in range(n_procs):
-            start_index = i * chunk_size
-            end_index = (i + 1) * chunk_size
-            df_chunk = self.org_df.iloc[start_index:end_index]
-            chunks.append(df_chunk)
-
+        chunks, n_chunks = split(self.org_df)
         if prep_func:
-            prep_func(chunks, n_procs) # any preprocessing needed
-        with Pool(n_procs) as pool:
+            prep_func(chunks, n_chunks) # any preprocessing needed
+        with Pool(n_chunks) as pool:
             results = pool.map(extraction_func, chunks)
         self.mod_df = pd.concat(results, ignore_index=True)
 
@@ -56,41 +59,52 @@ class FeatureExtractor:
         return url
 
 class FeatureSelector:
-    num_not_phishing: int
-    num_phishing: int
-    requested: int
-    gram_size: int
-    threshold: float
-    selected: int
-    space: set
+    num_not_phishing = 0
+    num_phishing = 0
+    selected = 0
+    requested = 0
+    gram_size = 0
+    threshold = 0.0
+    space = set()
+
+    csv_col_names = ['gram_names', 'frequency', 'correlation']
+    features_info = [[]]
 
     def __init__(self, gram_size, requested, threshold) -> None:
-        self.space = {}
-        self.selected = self.num_not_phishing = self.num_phishing = 0
         assert gram_size > 0
+        self.gram_size = gram_size
         max_f = CHAR_SPACE_LEN ** self.gram_size
         assert requested <= max_f
+        self.requested = requested
         assert threshold > 0 and threshold < 1
+        self.threshold = threshold
 
     def select(self, chunks, num_chunks) -> {}:
         with Pool(num_chunks) as pool:
             results = pool.map(self._build_dictionary, chunks)
 
-        total_grams_dict = dict()
+        total_grams_dict = {}
         for d in results:
             self._merge_dict(total_grams_dict, d)
 
         view = total_grams_dict.items()
-        sorted_grams_list = sorted(view, lambda it : it[1][0], reverse=True)
+        sorted_grams_list = sorted(view, lambda it : it[1][0], reverse = True)
         self._select_features(sorted_grams_list)
         return self.space.copy()
 
     def statistics(self) -> None:
+        print('Printing statistics')
         print(f'Number of selected grams [{num}]', self.selected)
         print(f'Threshold set to [{num}]', self.threshold)
 
+    def dump_info(self) -> None:
+        print('Dumping selected features data')
+        df = pd.DataFrame(data = features_info, cols = csv_col_names)
+        df.to_csv('features_info.csv', ignore_index = True)
+
+
     def _build_dictionary(self, df: pd.DataFrame) -> dict[str : tuple[int, int]]:
-        dct = dict()
+        dct = {}
         df.apply(lambda row : self._build_dict_process_row(row, dct), axis = 1)
         return dct
 
@@ -150,22 +164,23 @@ class FeatureSelector:
             ))
 
             if res >= self.threshold:
-                self.space.add(elem)
+                self.space.add(elem[0])
                 self.selected += 1
                 if self.selected == self.requested:
                     break
+
+            self.features_info.append([elem[0], elem[1][0], res])
 
 
 class FlexibleGramExtractor:
     fe: FeatureExtractor
     fs: FeatureSelector
-    selection_done: bool
-    gram_space: set
+    selection_done = False
+    gram_space = set()
 
     def __init__(self, paths, gram_size, requested_grams, threshold) -> None:
         self.fe = FeatureExtractor(paths)
         self.fs = FeatureSelector(gram_size, requested_grams, threshold)
-        self.selection_done = False
 
     def extract(self) -> None:
         self.fe.extract(self._prep, self._extract_features)
@@ -201,7 +216,6 @@ class FlexibleGramExtractor:
 
 class BigramExtractor:
     fe: FeatureExtractor
-    gram_size: int
 
     def __init__(self, paths) -> None:
         self.fe = FeatureExtractor(paths)
@@ -240,4 +254,3 @@ class BigramExtractor:
         for i in range(total_bigrams):
             idx = CHAR_INDEX[url[i]] * CHAR_SPACE_LEN + CHAR_INDEX[url[i + 1]]
             presence[idx] = 1
-
