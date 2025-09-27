@@ -17,6 +17,11 @@ LABEL_FIELD = 'label'
 FREQ_FIELD = 'frequency'
 GRAM_NAME_FIELD = 'gram_names'
 CORR_FIELD = 'correlation'
+PPV_FIELD = 'ppv'
+NPV_FIELD = 'npv'
+SENS_FIELD = 'sensitivity'
+SPEC_FIELD = 'specificity'
+FSCORE_FIELD = 'fscore'
 PHISHING_LABEL = 0
 NOT_PHISHING_LABEL = 1
 
@@ -69,19 +74,24 @@ class FeatureSelector:
     selected: int
     requested: int
     gram_size: int
-    threshold: float
     space: set
 
-    csv_col_names = [GRAM_NAME_FIELD, FREQ_FIELD, CORR_FIELD]
+    csv_col_names = [GRAM_NAME_FIELD, \
+                FREQ_FIELD, \
+                CORR_FIELD, \
+                PPV_FIELD, \
+                NPV_FIELD, \
+                SENS_FIELD, \
+                SPEC_FIELD, \
+                FSCORE_FIELD]
 
-    def __init__(self, gram_size, requested, threshold) -> None:
+    def __init__(self, gram_size, requested) -> None:
         assert gram_size > 0
         self.gram_size = gram_size
         max_f = CHAR_SPACE_LEN ** self.gram_size
         assert requested <= max_f
         self.requested = requested
-        assert threshold > 0 and threshold < 1
-        self.threshold = threshold
+
         self.num_not_phishing = self.num_phishing = self.selected = 0
         self.space = set()
         self.features_info = []
@@ -97,14 +107,16 @@ class FeatureSelector:
         print(f'Threshold set to [{self.threshold}]')
 
     def dump_info(self) -> None:
-        print(self.features_info[0])
         df = pd.DataFrame(data = self.features_info, columns = self.csv_col_names)
         df = df.astype({
             GRAM_NAME_FIELD: str,
             FREQ_FIELD: int,
-            CORR_FIELD: float
         })
-        df.to_csv('features_info.csv', index = False)
+        df.to_csv(f'features_info_{self.gram_size}.csv', index = False)
+        print(f'Zero ppv count [{self.zero_ppv_count}]')
+        print(f'Zero npv count [{self.zero_npv_count}]')
+        print(f'Zero sens count [{self.zero_sens_count}]')
+        print(f'Zero spec count [{self.zero_spec_count}]')
 
     def _build_dictionary(self, df: pd.DataFrame) -> dict[str : list]:
         dct = {}
@@ -116,6 +128,10 @@ class FeatureSelector:
             if url_len < self.gram_size:
                 continue
 
+            if label == NOT_PHISHING_LABEL:
+                self.num_not_phishing += 1
+            else:
+                self.num_phishing += 1
             aux_set = set()
             for i in range(url_len - self.gram_size):
                 key = url[i : i + self.gram_size]
@@ -126,16 +142,32 @@ class FeatureSelector:
                     aux_set.add(key)
                     if label == NOT_PHISHING_LABEL:
                         dct[key][1] += 1
-                        self.num_not_phishing += 1
-                    else:
-                        self.num_phishing += 1
         return dct
 
     # ranges from -1 to 1. 0 indicates no correlation.
     def _calc_mcc(self, tp, tn, fp, fn):
         return (tp*tn - fp*fn) / (((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn)) ** .5)
 
+    def _calc_ppv(self, tp, fp):
+        return tp / (tp+fp)
+
+    def _calc_npv(self, tn, fn):
+        return tn / (tn+fn)
+
+    def _calc_sens(self, tp, fn):
+        return tp / (tp+fn)
+
+    def _calc_spec(self, tn, fp):
+        return tn / (tn+fp)
+
+    def _calc_fscore(self, precision, recall):
+        return (2 * precision * recall) / (precision + recall)
+
     def _select_features(self, grams: dict) -> None:
+        self.zero_ppv_count = 0
+        self.zero_npv_count = 0
+        self.zero_sens_count = 0
+        self.zero_spec_count = 0
         gram_and_corr = []
         for elem in grams.items():
             total = elem[1][0]
@@ -143,13 +175,41 @@ class FeatureSelector:
             present_phishing = total - present_not_phishing
             not_present_not_phishing = self.num_not_phishing - present_not_phishing
             not_present_phishing = self.num_phishing - present_phishing
-            res = abs(self._calc_mcc(
+            corr = abs(self._calc_mcc(
                 present_phishing,
                 not_present_not_phishing,
                 present_not_phishing,
                 not_present_phishing
             ))
-            gram_and_corr.append([elem[0], total, res])
+            ppv = self._calc_ppv(
+                present_phishing,
+                present_not_phishing
+            )
+            if ppv == 0:
+                self.zero_ppv_count += 1
+            npv = self._calc_npv(
+                not_present_not_phishing,
+                not_present_phishing
+            )
+            if npv == 0:
+                self.zero_npv_count += 1
+            sens = self._calc_sens(
+                present_phishing,
+                not_present_phishing
+            )
+            if sens == 0:
+                self.zero_sens_count += 1
+            spec = self._calc_spec(
+                not_present_not_phishing,
+                present_not_phishing
+            )
+            if spec == 0:
+                self.zero_spec_count += 1
+            fscore = self._calc_fscore(
+                ppv,
+                sens
+            )
+            gram_and_corr.append([elem[0], total, corr, ppv, npv, sens, spec, fscore])
 
         sorted_corr = sorted(gram_and_corr, key = lambda it : it[2], reverse = True)
         for i in range(self.requested):
