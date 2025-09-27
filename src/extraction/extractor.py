@@ -14,8 +14,11 @@ CHAR_INDEX = {c: i for i, c in enumerate(CHAR_SPACE)}
 
 URL_FIELD = 'URL'
 LABEL_FIELD = 'label'
-PHISHING_LABEL = 1
-NOT_PHISHING_LABEL = 0
+FREQ_FIELD = 'frequency'
+GRAM_NAME_FIELD = 'gram_names'
+CORR_FIELD = 'correlation'
+PHISHING_LABEL = 0
+NOT_PHISHING_LABEL = 1
 
 # Strip scheme and characters outside CHAR_SPACE
 def strip_url(url: str) -> str:
@@ -69,8 +72,7 @@ class FeatureSelector:
     threshold: float
     space: set
 
-    csv_col_names = ['gram_names', 'frequency', 'correlation']
-    features_info = [[]]
+    csv_col_names = [GRAM_NAME_FIELD, FREQ_FIELD, CORR_FIELD]
 
     def __init__(self, gram_size, requested, threshold) -> None:
         assert gram_size > 0
@@ -82,6 +84,7 @@ class FeatureSelector:
         self.threshold = threshold
         self.num_not_phishing = self.num_phishing = self.selected = 0
         self.space = set()
+        self.features_info = []
 
     def select(self, df : pd.DataFrame) -> set:
         total_grams_dict = self._build_dictionary(df)
@@ -94,7 +97,13 @@ class FeatureSelector:
         print(f'Threshold set to [{self.threshold}]')
 
     def dump_info(self) -> None:
+        print(self.features_info[0])
         df = pd.DataFrame(data = self.features_info, columns = self.csv_col_names)
+        df = df.astype({
+            GRAM_NAME_FIELD: str,
+            FREQ_FIELD: int,
+            CORR_FIELD: float
+        })
         df.to_csv('features_info.csv', index = False)
 
     def _build_dictionary(self, df: pd.DataFrame) -> dict[str : list]:
@@ -130,10 +139,10 @@ class FeatureSelector:
         gram_and_corr = []
         for elem in grams.items():
             total = elem[1][0]
-            present_not_phishing = elem[1][1] # false positive
-            present_phishing = total - present_not_phishing # true positive
-            not_present_not_phishing = self.num_not_phishing - present_not_phishing # true negative
-            not_present_phishing = self.num_phishing - present_phishing # false negative
+            present_not_phishing = elem[1][1]
+            present_phishing = total - present_not_phishing
+            not_present_not_phishing = self.num_not_phishing - present_not_phishing
+            not_present_phishing = self.num_phishing - present_phishing
             res = abs(self._calc_mcc(
                 present_phishing,
                 not_present_not_phishing,
@@ -144,7 +153,6 @@ class FeatureSelector:
 
         sorted_corr = sorted(gram_and_corr, key = lambda it : it[2], reverse = True)
         for i in range(self.requested):
-            print(sorted_corr[i][0], sorted_corr[i][1], sorted_corr[i][2])
             self.features_info.append(sorted_corr[i])
             self.space.add(sorted_corr[i][0])
 
