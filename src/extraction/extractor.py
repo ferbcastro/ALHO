@@ -19,6 +19,7 @@ GRAM_NAME_FIELD = 'gram_names'
 CORR_FIELD = 'correlation'
 PREC_FIELD = 'precision'
 RECA_FIELD = 'recall'
+FSCORE_FIELD = 'fscore'
 PHISHING_LABEL = 0
 NOT_PHISHING_LABEL = 1
 
@@ -73,7 +74,7 @@ class FeatureSelector:
     gram_size: int
     space: set
 
-    csv_col_names = [GRAM_NAME_FIELD, FREQ_FIELD, CORR_FIELD, PREC_FIELD, RECA_FIELD]
+    csv_col_names = [GRAM_NAME_FIELD, FREQ_FIELD, CORR_FIELD, PREC_FIELD, RECA_FIELD, FSCORE_FIELD]
 
     def __init__(self, gram_size, requested) -> None:
         assert gram_size > 0
@@ -103,7 +104,8 @@ class FeatureSelector:
             FREQ_FIELD: int,
             CORR_FIELD: float,
             PREC_FIELD: float,
-            RECA_FIELD: float
+            RECA_FIELD: float,
+            FSCORE_FIELD: float
         })
         df.to_csv(f'features_info_{self.gram_size}.csv', index = False)
 
@@ -143,6 +145,9 @@ class FeatureSelector:
     def _calc_recall(self, tn, fn):
         return tn / (tn+fn)
 
+    def _calc_fscore(self, precision, recall):
+        return (2 * precision * recall) / (precision + recall)
+
     def _select_features(self, grams: dict) -> None:
         gram_and_corr = []
         for elem in grams.items():
@@ -165,7 +170,11 @@ class FeatureSelector:
                 not_present_not_phishing,
                 not_present_phishing
             )
-            gram_and_corr.append([elem[0], total, corr, prec, recl])
+            fscore = self._calc_fscore(
+                prec,
+                recl
+            )
+            gram_and_corr.append([elem[0], total, corr, prec, recl, fscore])
 
         sorted_corr = sorted(gram_and_corr, key = lambda it : it[2], reverse = True)
         for i in range(self.requested):
