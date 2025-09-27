@@ -24,8 +24,8 @@ se3.dump_info()
 
 size = 4
 request = 1024
-se3 = FeatureSelector(size, request)
+se4 = FeatureSelector(size, request)
 print("selecting 4-grams...")
-se3.select(df)
+se4.select(df)
 print("exporting...")
-se3.dump_info()
+se4.dump_info()
