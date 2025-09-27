@@ -17,8 +17,10 @@ LABEL_FIELD = 'label'
 FREQ_FIELD = 'frequency'
 GRAM_NAME_FIELD = 'gram_names'
 CORR_FIELD = 'correlation'
-PREC_FIELD = 'precision'
-RECA_FIELD = 'recall'
+PPV_FIELD = 'ppv'
+NPV_FIELD = 'npv'
+SENS_FIELD = 'sensitivity'
+SPEC_FIELD = 'specificity'
 FSCORE_FIELD = 'fscore'
 PHISHING_LABEL = 0
 NOT_PHISHING_LABEL = 1
@@ -74,7 +76,14 @@ class FeatureSelector:
     gram_size: int
     space: set
 
-    csv_col_names = [GRAM_NAME_FIELD, FREQ_FIELD, CORR_FIELD, PREC_FIELD, RECA_FIELD, FSCORE_FIELD]
+    csv_col_names = [GRAM_NAME_FIELD, \
+                FREQ_FIELD, \
+                CORR_FIELD, \
+                PPV_FIELD, \
+                NPV_FIELD, \
+                SENS_FIELD, \
+                SPEC_FIELD, \
+                FSCORE_FIELD]
 
     def __init__(self, gram_size, requested) -> None:
         assert gram_size > 0
@@ -102,12 +111,12 @@ class FeatureSelector:
         df = df.astype({
             GRAM_NAME_FIELD: str,
             FREQ_FIELD: int,
-            CORR_FIELD: float,
-            PREC_FIELD: float,
-            RECA_FIELD: float,
-            FSCORE_FIELD: float
         })
         df.to_csv(f'features_info_{self.gram_size}.csv', index = False)
+        print(f'Zero ppv count [{self.zero_ppv_count}]')
+        print(f'Zero npv count [{self.zero_npv_count}]')
+        print(f'Zero sens count [{self.zero_sens_count}]')
+        print(f'Zero spec count [{self.zero_spec_count}]')
 
     def _build_dictionary(self, df: pd.DataFrame) -> dict[str : list]:
         dct = {}
@@ -139,16 +148,26 @@ class FeatureSelector:
     def _calc_mcc(self, tp, tn, fp, fn):
         return (tp*tn - fp*fn) / (((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn)) ** .5)
 
-    def _calc_precision(self, tp, fp):
+    def _calc_ppv(self, tp, fp):
         return tp / (tp+fp)
 
-    def _calc_recall(self, tn, fn):
+    def _calc_npv(self, tn, fn):
         return tn / (tn+fn)
+
+    def _calc_sens(self, tp, fn):
+        return tp / (tp+fn)
+
+    def _calc_spec(self, tn, fp):
+        return tn / (tn+fp)
 
     def _calc_fscore(self, precision, recall):
         return (2 * precision * recall) / (precision + recall)
 
     def _select_features(self, grams: dict) -> None:
+        self.zero_ppv_count = 0
+        self.zero_npv_count = 0
+        self.zero_sens_count = 0
+        self.zero_spec_count = 0
         gram_and_corr = []
         for elem in grams.items():
             total = elem[1][0]
@@ -162,19 +181,35 @@ class FeatureSelector:
                 present_not_phishing,
                 not_present_phishing
             ))
-            prec = self._calc_precision(
+            ppv = self._calc_ppv(
                 present_phishing,
                 present_not_phishing
             )
-            recl = self._calc_recall(
+            if ppv == 0:
+                self.zero_ppv_count += 1
+            npv = self._calc_npv(
                 not_present_not_phishing,
                 not_present_phishing
             )
-            fscore = self._calc_fscore(
-                prec,
-                recl
+            if npv == 0:
+                self.zero_npv_count += 1
+            sens = self._calc_sens(
+                present_phishing,
+                not_present_phishing
             )
-            gram_and_corr.append([elem[0], total, corr, prec, recl, fscore])
+            if sens == 0:
+                self.zero_sens_count += 1
+            spec = self._calc_spec(
+                not_present_not_phishing,
+                present_not_phishing
+            )
+            if spec == 0:
+                self.zero_spec_count += 1
+            fscore = self._calc_fscore(
+                ppv,
+                sens
+            )
+            gram_and_corr.append([elem[0], total, corr, ppv, npv, sens, spec, fscore])
 
         sorted_corr = sorted(gram_and_corr, key = lambda it : it[2], reverse = True)
         for i in range(self.requested):
