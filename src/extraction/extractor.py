@@ -1,27 +1,30 @@
+import sys
 from multiprocessing import Pool, cpu_count
 from urllib.parse import urlparse
 from typing import *
 
 import pandas as pd
 import math
-import sys
 import re
+import string
 
 CHAR_SPACE = string.printable[:-6] # printable characters except whitespaces
 CHAR_SPACE_LEN = len(CHAR_SPACE)
 CHAR_INDEX = {c: i for i, c in enumerate(CHAR_SPACE)}
 
+URL_FIELD = 'URL'
+LABEL_FIELD = 'label'
+PHISHING_LABEL = 1
+NOT_PHISHING_LABEL = 0
 
-def split(df : pd.DataFrame) -> list, int:
-    n_procs = cpu_count()
-    chunk_size = math.ceil(self.org_df.shape[0] / n_procs)
-    chunks = []
-    for i in range(n_procs):
-        start_index = i * chunk_size
-        end_index = (i + 1) * chunk_size
-        df_chunk = self.org_df.iloc[start_index:end_index]
-        chunks.append(df_chunk)
-    return chunks, n_procs
+# Strip scheme and characters outside CHAR_SPACE
+def strip_url(url: str) -> str:
+    url = "".join(char for char in url if char in CHAR_SPACE)
+
+    if (scheme := urlparse(url).scheme):
+        url = re.sub(f"^{scheme}://", "", url)
+
+    return url
 
 class FeatureExtractor:
     org_df: pd.DataFrame
@@ -35,11 +38,19 @@ class FeatureExtractor:
             frames.append(tmp)
 
         df = pd.concat(frames, ignore_index=True)
-        df['url'] = df['url'].apply(self._strip_url)
+        df['url'] = df['url'].apply(strip_url)
         org_df = mod_df = df
 
     def extract(self, prep_func, extraction_func) -> None:
-        chunks, n_chunks = split(self.org_df)
+        n_procs = cpu_count()
+        chunk_size = math.ceil(org_df.shape[0] / n_procs)
+        chunks = []
+        for i in range(n_procs):
+            start_index = i * chunk_size
+            end_index = (i + 1) * chunk_size
+            df_chunk = org_df.iloc[start_index:end_index]
+            chunks.append(df_chunk)
+        n_chunks = n_procs
         if prep_func:
             prep_func(chunks, n_chunks) # any preprocessing needed
         with Pool(n_chunks) as pool:
@@ -49,23 +60,14 @@ class FeatureExtractor:
     def export(self, path: str) -> None:
         self.mod_df.to_csv(path, index=False)
 
-    # Strip scheme and characters outside CHAR_SPACE
-    def _strip_url(self, url: str) -> str:
-        url = "".join(char for char in url if char in CHAR_SPACE)
-
-        if (scheme := urlparse(url).scheme):
-            url = re.sub(f"^{scheme}://", "", url)
-
-        return url
-
 class FeatureSelector:
-    num_not_phishing = 0
-    num_phishing = 0
-    selected = 0
-    requested = 0
-    gram_size = 0
-    threshold = 0.0
-    space = set()
+    num_not_phishing: int
+    num_phishing: int
+    selected: int
+    requested: int
+    gram_size: int
+    threshold: float
+    space: set
 
     csv_col_names = ['gram_names', 'frequency', 'correlation']
     features_info = [[]]
@@ -78,99 +80,73 @@ class FeatureSelector:
         self.requested = requested
         assert threshold > 0 and threshold < 1
         self.threshold = threshold
+        self.num_not_phishing = self.num_phishing = self.selected = 0
+        self.space = set()
 
-    def select(self, chunks, num_chunks) -> {}:
-        with Pool(num_chunks) as pool:
-            results = pool.map(self._build_dictionary, chunks)
-
-        total_grams_dict = {}
-        for d in results:
-            self._merge_dict(total_grams_dict, d)
-
-        view = total_grams_dict.items()
-        sorted_grams_list = sorted(view, lambda it : it[1][0], reverse = True)
-        self._select_features(sorted_grams_list)
-        return self.space.copy()
+    def select(self, df : pd.DataFrame) -> set:
+        total_grams_dict = self._build_dictionary(df)
+        self._select_features(total_grams_dict)
+        return self.space
 
     def statistics(self) -> None:
         print('Printing statistics')
-        print(f'Number of selected grams [{num}]', self.selected)
-        print(f'Threshold set to [{num}]', self.threshold)
+        print(f'Number of selected grams [{self.selected}]')
+        print(f'Threshold set to [{self.threshold}]')
 
     def dump_info(self) -> None:
-        print('Dumping selected features data')
-        df = pd.DataFrame(data = features_info, cols = csv_col_names)
-        df.to_csv('features_info.csv', ignore_index = True)
+        df = pd.DataFrame(data = self.features_info, columns = self.csv_col_names)
+        df.to_csv('features_info.csv', index = False)
 
-
-    def _build_dictionary(self, df: pd.DataFrame) -> dict[str : tuple[int, int]]:
+    def _build_dictionary(self, df: pd.DataFrame) -> dict[str : list]:
         dct = {}
-        df.apply(lambda row : self._build_dict_process_row(row, dct), axis = 1)
+        for _, row in df.iterrows():
+            url = row[URL_FIELD]
+            label = row[LABEL_FIELD]
+            url_len = len(url)
+
+            if url_len < self.gram_size:
+                continue
+
+            aux_set = set()
+            for i in range(url_len - self.gram_size):
+                key = url[i : i + self.gram_size]
+                if key not in aux_set:
+                    if key not in dct:
+                        dct.update({key : [1, 0]})
+                    dct[key][0] += 1
+                    aux_set.add(key)
+                    if label == NOT_PHISHING_LABEL:
+                        dct[key][1] += 1
+                        self.num_not_phishing += 1
+                    else:
+                        self.num_phishing += 1
         return dct
-
-    def _build_dict_process_row(self, row: pd.Series, dct) -> None:
-        url = row['url']
-        label = row['label']
-        url_len = len(url)
-
-        if url_len < self.gram_size:
-            return
-
-        for i in range(urlSize - gramSize):
-            key = url[i : i + gramSize]
-            if key in dct:
-                dct['key'][0] += 1
-            else:
-                dct.update({key : [1, 0]})
-            if label == 0:
-                dct['key'][1] += 1
-                self.num_not_phishing += 1
-            else:
-                self.num_phishing += 1
-
-    # merge in dct1
-    def _merge_dict(
-        self,
-        dct1: dict[str, tuple[int, int]],
-        dct2: dict[str, tuple[int, int]]
-    ):
-        for k, v in dct2.items():
-            if k in dct1:
-                dct1[k] = tuple(a + b for a, b in zip(dct1[k], v))
-            else:
-                dct1[k] = v
 
     # ranges from -1 to 1. 0 indicates no correlation.
     def _calc_mcc(self, tp, tn, fp, fn):
-        return (tp*tn - fp*fn) / (((tp+fp)(tp+fn)(tn+fp)(tn+fn)) ** .5)
+        return (tp*tn - fp*fn) / (((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn)) ** .5)
 
-    def _select_features(self, grams: list) -> None:
-        for elem in grams:
+    def _select_features(self, grams: dict) -> None:
+        gram_and_corr = []
+        for elem in grams.items():
             total = elem[1][0]
-            # false positive
-            present_not_phishing = elem[1][1]
-            # true positive
-            present_phishing = total - present_not_phishing
-            # true negative
-            not_present_not_phishing = self.num_not_phishing - present_not_phishing
-            # false negative
-            not_present_phishing = self.num_phishing - present_phishing
-
+            present_not_phishing = elem[1][1] # false positive
+            present_phishing = total - present_not_phishing # true positive
+            not_present_not_phishing = self.num_not_phishing - present_not_phishing # true negative
+            not_present_phishing = self.num_phishing - present_phishing # false negative
             res = abs(self._calc_mcc(
                 present_phishing,
                 not_present_not_phishing,
-                present_phishing,
+                present_not_phishing,
                 not_present_phishing
             ))
+            gram_and_corr.append([elem[0], total, res])
 
-            if res >= self.threshold:
-                self.space.add(elem[0])
-                self.selected += 1
-                if self.selected == self.requested:
-                    break
-
-            self.features_info.append([elem[0], elem[1][0], res])
-
+        sorted_corr = sorted(gram_and_corr, key = lambda it : it[2], reverse = True)
+        for i in range(self.requested):
+            print(sorted_corr[i][0], sorted_corr[i][1], sorted_corr[i][2])
+            self.features_info.append(sorted_corr[i])
+            self.space.add(sorted_corr[i][0])
 
 class FlexibleGramExtractor:
     fe: FeatureExtractor

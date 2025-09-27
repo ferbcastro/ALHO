@@ -1,4 +1,4 @@
-import extraction.extractor as fe
+from extraction.extractor import BigramExtractor as fe
 import sys
 
 if len(sys.argv) < 2:

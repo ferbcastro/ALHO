@@ -1,7 +1,6 @@
-import extraction.FeatureSelector as fs
-from extraction.extractor import split
-from multiprocessing import Pool, cpu_count
 import sys
+from extraction.extractor import FeatureSelector
+from extraction.extractor import strip_url
 import pandas as pd
 
 if len(sys.argv) < 2:
@@ -12,14 +11,15 @@ frames = []
 for path in sys.argv[1:]:
     tmp = pd.read_csv(path)
     frames.append(tmp)
-chunks, num_chunks = split(frames)
+df = pd.concat(frames, ignore_index = True)
+df['URL'] = df['URL'].apply(strip_url)
 
 size = 3
-request = 1000
+request = 1024
 threshold = 0.3
 
-se = fs.FeatureSelector(size, request, threshold)
+se = FeatureSelector(size, request, threshold)
 print("selecting...")
-se.select(chunks, num_chunks)
+se.select(df)
 print("exporting...")
 se.dump_info()
