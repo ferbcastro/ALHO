@@ -105,7 +105,7 @@ class FeatureSelector:
             PREC_FIELD: float,
             RECA_FIELD: float
         })
-        df.to_csv('features_info.csv', index = False)
+        df.to_csv(f'features_info_{self.gram_size}.csv', index = False)
 
     def _build_dictionary(self, df: pd.DataFrame) -> dict[str : list]:
         dct = {}
@@ -117,6 +117,10 @@ class FeatureSelector:
             if url_len < self.gram_size:
                 continue
 
+            if label == NOT_PHISHING_LABEL:
+                self.num_not_phishing += 1
+            else:
+                self.num_phishing += 1
             aux_set = set()
             for i in range(url_len - self.gram_size):
                 key = url[i : i + self.gram_size]
@@ -127,9 +131,6 @@ class FeatureSelector:
                     aux_set.add(key)
                     if label == NOT_PHISHING_LABEL:
                         dct[key][1] += 1
-                        self.num_not_phishing += 1
-                    else:
-                        self.num_phishing += 1
         return dct
 
     # ranges from -1 to 1. 0 indicates no correlation.

@@ -16,9 +16,16 @@ df['URL'] = df['URL'].apply(strip_url)
 
 size = 3
 request = 1024
-
-se = FeatureSelector(size, request)
-print("selecting...")
-se.select(df)
+se3 = FeatureSelector(size, request)
+print("selecting 3-grams...")
+se3.select(df)
 print("exporting...")
-se.dump_info()
+se3.dump_info()
+
+size = 4
+request = 1024
+se3 = FeatureSelector(size, request)
+print("selecting 4-grams...")
+se3.select(df)
+print("exporting...")
+se3.dump_info()
