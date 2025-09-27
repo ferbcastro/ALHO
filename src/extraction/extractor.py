@@ -17,6 +17,8 @@ LABEL_FIELD = 'label'
 FREQ_FIELD = 'frequency'
 GRAM_NAME_FIELD = 'gram_names'
 CORR_FIELD = 'correlation'
+PREC_FIELD = 'precision'
+RECA_FIELD = 'recall'
 PHISHING_LABEL = 0
 NOT_PHISHING_LABEL = 1
 
@@ -69,19 +71,17 @@ class FeatureSelector:
     selected: int
     requested: int
     gram_size: int
-    threshold: float
     space: set
 
-    csv_col_names = [GRAM_NAME_FIELD, FREQ_FIELD, CORR_FIELD]
+    csv_col_names = [GRAM_NAME_FIELD, FREQ_FIELD, CORR_FIELD, PREC_FIELD, RECA_FIELD]
 
-    def __init__(self, gram_size, requested, threshold) -> None:
+    def __init__(self, gram_size, requested) -> None:
         assert gram_size > 0
         self.gram_size = gram_size
         max_f = CHAR_SPACE_LEN ** self.gram_size
         assert requested <= max_f
         self.requested = requested
-        assert threshold > 0 and threshold < 1
-        self.threshold = threshold
+
         self.num_not_phishing = self.num_phishing = self.selected = 0
         self.space = set()
         self.features_info = []
@@ -97,12 +97,13 @@ class FeatureSelector:
         print(f'Threshold set to [{self.threshold}]')
 
     def dump_info(self) -> None:
-        print(self.features_info[0])
         df = pd.DataFrame(data = self.features_info, columns = self.csv_col_names)
         df = df.astype({
             GRAM_NAME_FIELD: str,
             FREQ_FIELD: int,
-            CORR_FIELD: float
+            CORR_FIELD: float,
+            PREC_FIELD: float,
+            RECA_FIELD: float
         })
         df.to_csv('features_info.csv', index = False)
 
@@ -135,6 +136,12 @@ class FeatureSelector:
     def _calc_mcc(self, tp, tn, fp, fn):
         return (tp*tn - fp*fn) / (((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn)) ** .5)
 
+    def _calc_precision(self, tp, fp):
+        return tp / (tp+fp)
+
+    def _calc_recall(self, tn, fn):
+        return tn / (tn+fn)
+
     def _select_features(self, grams: dict) -> None:
         gram_and_corr = []
         for elem in grams.items():
@@ -143,13 +150,21 @@ class FeatureSelector:
             present_phishing = total - present_not_phishing
             not_present_not_phishing = self.num_not_phishing - present_not_phishing
             not_present_phishing = self.num_phishing - present_phishing
-            res = abs(self._calc_mcc(
+            corr = abs(self._calc_mcc(
                 present_phishing,
                 not_present_not_phishing,
                 present_not_phishing,
                 not_present_phishing
             ))
-            gram_and_corr.append([elem[0], total, res])
+            prec = self._calc_precision(
+                present_phishing,
+                present_not_phishing
+            )
+            recl = self._calc_recall(
+                not_present_not_phishing,
+                not_present_phishing
+            )
+            gram_and_corr.append([elem[0], total, corr, prec, recl])
 
         sorted_corr = sorted(gram_and_corr, key = lambda it : it[2], reverse = True)
         for i in range(self.requested):

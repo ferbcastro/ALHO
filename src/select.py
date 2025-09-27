@@ -16,9 +16,8 @@ df['URL'] = df['URL'].apply(strip_url)
 
 size = 3
 request = 1024
-threshold = 0.3
 
-se = FeatureSelector(size, request, threshold)
+se = FeatureSelector(size, request)
 print("selecting...")
 se.select(df)
 print("exporting...")
