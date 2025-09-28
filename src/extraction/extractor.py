@@ -20,8 +20,6 @@ NPV_FIELD = 'npv'
 SENS_FIELD = 'sensitivity'
 SPEC_FIELD = 'specificity'
 FSCORE_FIELD = 'fscore'
-PHISHING_LABEL = 0
-NOT_PHISHING_LABEL = 1
 
 # Strip scheme and characters outside CHAR_SPACE
 def strip_url(url: str) -> str:
@@ -73,20 +71,19 @@ class FeatureSelector:
     requested: int
     gram_size: int
     space: set
+    label_phishing: int
+    label_legitimate: int
 
-    zero_ppv_count = 0
-    zero_npv_count = 0
-    zero_sens_count = 0
-    zero_spec_count = 0
+    cols_1 = [GRAM_NAME_FIELD, \
+            FREQ_FIELD, \
+            CORR_FIELD, \
+            PPV_FIELD, \
+            NPV_FIELD, \
+            SENS_FIELD, \
+            SPEC_FIELD, \
+            FSCORE_FIELD]
 
-    csv_col_names = [GRAM_NAME_FIELD, \
-                FREQ_FIELD, \
-                CORR_FIELD, \
-                PPV_FIELD, \
-                NPV_FIELD, \
-                SENS_FIELD, \
-                SPEC_FIELD, \
-                FSCORE_FIELD]
+    cols_2 = [GRAM_NAME_FIELD, FREQ_FIELD]
 
     def __init__(self, gram_size, requested) -> None:
         assert gram_size > 0
@@ -99,26 +96,33 @@ class FeatureSelector:
         self.space = set()
         self.features_info = []
 
-    def select(self, df : pd.DataFrame) -> set:
+    def select(self, df : pd.DataFrame, l_phishing, l_legitimate) -> set:
+        self.label_phishing = l_phishing
+        self.label_legitimate = l_legitimate
         total_grams_dict = self._build_dictionary(df)
-        self._select_features(total_grams_dict)
+        if self.num_not_phishing == 0 or self.num_phishing == 0:
+            print('selecting based on frequency only...')
+            self._select_features_on_freqs(total_grams_dict)
+        else:
+            print('selecting based on frequency and ppv...')
+            self._select_features_on_ppv_freqs(total_grams_dict)
         return self.space
 
     def statistics(self) -> None:
-        print('Printing statistics')
-        print(f'Number of selected grams [{self.selected}]')
+        print('printing statistics')
+        print(f'number of selected grams [{self.selected}]')
 
     def dump_info(self, name : str) -> None:
-        df = pd.DataFrame(data = self.features_info, columns = self.csv_col_names)
+        if self.num_phishing == 0 or self.num_not_phishing == 0:
+            df = pd.DataFrame(data = self.features_info, columns = self.cols_2)
+        else:
+            df = pd.DataFrame(data = self.features_info, columns = self.cols_1)
         df = df.astype({
             GRAM_NAME_FIELD: str,
-            FREQ_FIELD: int,
+            FREQ_FIELD: int
         })
+
         df.to_csv(f'features_{name}_{self.gram_size}.csv', index = False)
-        print(f'Zero ppv count [{self.zero_ppv_count}]')
-        print(f'Zero npv count [{self.zero_npv_count}]')
-        print(f'Zero sens count [{self.zero_sens_count}]')
-        print(f'Zero spec count [{self.zero_spec_count}]')
 
     def _build_dictionary(self, df: pd.DataFrame) -> dict[str : list]:
         dct = {}
@@ -130,7 +134,7 @@ class FeatureSelector:
             if url_len < self.gram_size:
                 continue
 
-            if label == NOT_PHISHING_LABEL:
+            if label == self.label_legitimate:
                 self.num_not_phishing += 1
             else:
                 self.num_phishing += 1
@@ -144,7 +148,7 @@ class FeatureSelector:
                         dct.update({key : [1, 0]})
                     dct[key][0] += 1
                     aux_set.add(key)
-                    if label == NOT_PHISHING_LABEL:
+                    if label == self.label_legitimate:
                         dct[key][1] += 1
         return dct
 
@@ -167,7 +171,14 @@ class FeatureSelector:
     def _calc_fscore(self, precision, recall):
         return (2 * precision * recall) / (precision + recall)
 
-    def _select_features(self, grams: dict) -> None:
+    def _select_features_on_freqs(self, grams: dict) -> None:
+        view = grams.items()
+        sorted_arr_freqs = sorted(view, key = lambda it : it[1][0], reverse = True)
+        for elem in sorted_arr_freqs[:self.requested]:
+            self.features_info.append([elem[0], elem[1][0]])
+            self.space.add(elem[0])
+
+    def _select_features_on_ppv_freqs(self, grams: dict) -> None:
         gram_and_corr = []
         for elem in grams.items():
             total = elem[1][0]
@@ -175,6 +186,7 @@ class FeatureSelector:
             present_phishing = total - present_not_phishing
             not_present_not_phishing = self.num_not_phishing - present_not_phishing
             not_present_phishing = self.num_phishing - present_phishing
+
             corr = abs(self._calc_mcc(
                 present_phishing,
                 not_present_not_phishing,
@@ -185,26 +197,18 @@ class FeatureSelector:
                 present_phishing,
                 present_not_phishing
             )
-            if ppv == 0:
-                self.zero_ppv_count += 1
             npv = self._calc_npv(
                 not_present_not_phishing,
                 not_present_phishing
             )
-            if npv == 0:
-                self.zero_npv_count += 1
             sens = self._calc_sens(
                 present_phishing,
                 not_present_phishing
             )
-            if sens == 0:
-                self.zero_sens_count += 1
             spec = self._calc_spec(
                 not_present_not_phishing,
                 present_not_phishing
             )
-            if spec == 0:
-                self.zero_spec_count += 1
             fscore = self._calc_fscore(
                 ppv,
                 sens
@@ -215,8 +219,8 @@ class FeatureSelector:
         sorted_arr_ppv_sub = sorted_arr_ppv[:self.requested]
         sorted_arr_freq_sub = sorted(sorted_arr_ppv_sub, key = lambda it : it[1], reverse = True)
         self.features_info = sorted_arr_freq_sub
-        for i in range(self.requested):
-            self.space.add(sorted_arr_freq_sub[i][0])
+        for elem in self.features_info:
+            self.space.add(elem[0])
 
 class FlexibleGramExtractor:
     fe: FeatureExtractor

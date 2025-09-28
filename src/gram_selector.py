@@ -10,25 +10,17 @@ if len(sys.argv) < 2:
 USECOLS = ['URL', 'label']
 DTYPES = {'URL': 'string', 'label': 'int8'}
 
-frames = []
-for path in sys.argv[1:]:
-    tmp = pd.read_csv(path, usecols = USECOLS, dtype = DTYPES)
-    frames.append(tmp)
-df = pd.concat(frames, ignore_index = True)
-# df['URL'] = df['URL'].apply(strip_url)
-
-# size = 3
-# request = 1024
-# se3 = FeatureSelector(size, request)
-# print("selecting 3-grams...")
-# se3.select(df)
-# print("exporting...")
-# se3.dump_info()
-
 size = 4
 request = 2046
-se4 = FeatureSelector(size, request)
-print("selecting 4-grams...")
-se4.select(df)
-print("exporting...")
-se4.dump_info()
+l_phishing = int(input("Label if phishing: "))
+l_legitimate = 1 - l_phishing
+for path in sys.argv[1:]:
+    source = input("Source: ")
+    df = pd.read_csv(path, usecols = USECOLS, dtype = DTYPES)
+    se4 = FeatureSelector(size, request)
+    print("selecting 4-grams...")
+    se4.select(df, l_phishing, l_legitimate)
+    print("exporting...")
+    se4.dump_info(source)
+
+# df['URL'] = df['URL'].apply(strip_url)
