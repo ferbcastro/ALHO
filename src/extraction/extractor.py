@@ -108,13 +108,13 @@ class FeatureSelector:
         print('Printing statistics')
         print(f'Number of selected grams [{self.selected}]')
 
-    def dump_info(self) -> None:
+    def dump_info(self, name : str) -> None:
         df = pd.DataFrame(data = self.features_info, columns = self.csv_col_names)
         df = df.astype({
             GRAM_NAME_FIELD: str,
             FREQ_FIELD: int,
         })
-        df.to_csv(f'features_info_{self.gram_size}.csv', index = False)
+        df.to_csv(f'features_{name}_{self.gram_size}.csv', index = False)
         print(f'Zero ppv count [{self.zero_ppv_count}]')
         print(f'Zero npv count [{self.zero_npv_count}]')
         print(f'Zero sens count [{self.zero_sens_count}]')
@@ -137,6 +137,8 @@ class FeatureSelector:
             aux_set = set()
             for i in range(url_len - self.gram_size):
                 key = url[i : i + self.gram_size]
+                if key.isdigit():
+                    continue
                 if key not in aux_set:
                     if key not in dct:
                         dct.update({key : [1, 0]})
@@ -209,10 +211,12 @@ class FeatureSelector:
             )
             gram_and_corr.append([elem[0], total, corr, ppv, npv, sens, spec, fscore])
 
-        sorted_corr = sorted(gram_and_corr, key = lambda it : it[2], reverse = True)
+        sorted_arr_ppv = sorted(gram_and_corr, key = lambda it : it[3], reverse = True)
+        sorted_arr_ppv_sub = sorted_arr_ppv[:self.requested]
+        sorted_arr_freq_sub = sorted(sorted_arr_ppv_sub, key = lambda it : it[1], reverse = True)
+        self.features_info = sorted_arr_freq_sub
         for i in range(self.requested):
-            self.features_info.append(sorted_corr[i])
-            self.space.add(sorted_corr[i][0])
+            self.space.add(sorted_arr_freq_sub[i][0])
 
 class FlexibleGramExtractor:
     fe: FeatureExtractor
