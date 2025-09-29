@@ -1,12 +1,10 @@
-import sys
 from multiprocessing import Pool, cpu_count
 from urllib.parse import urlparse
-from typing import *
 
-import pandas as pd
 import math
 import re
 import string
+import pandas as pd
 
 CHAR_SPACE = string.printable[:-6] # printable characters except whitespaces
 CHAR_SPACE_LEN = len(CHAR_SPACE)
@@ -47,20 +45,20 @@ class FeatureExtractor:
 
         df = pd.concat(frames, ignore_index=True)
         df['url'] = df['url'].apply(strip_url)
-        org_df = mod_df = df
+        self.org_df = self.mod_df = df
 
     def extract(self, prep_func, extraction_func) -> None:
         n_procs = cpu_count()
-        chunk_size = math.ceil(org_df.shape[0] / n_procs)
+        chunk_size = math.ceil(self.org_df.shape[0] / n_procs)
         chunks = []
         for i in range(n_procs):
             start_index = i * chunk_size
             end_index = (i + 1) * chunk_size
-            df_chunk = org_df.iloc[start_index:end_index]
+            df_chunk = self.org_df.iloc[start_index:end_index]
             chunks.append(df_chunk)
         n_chunks = n_procs
         if prep_func:
-            prep_func(chunks, n_chunks) # any preprocessing needed
+            prep_func(self.org_df) # any preprocessing needed
         with Pool(n_chunks) as pool:
             results = pool.map(extraction_func, chunks)
         self.mod_df = pd.concat(results, ignore_index=True)
@@ -75,6 +73,11 @@ class FeatureSelector:
     requested: int
     gram_size: int
     space: set
+
+    zero_ppv_count = 0
+    zero_npv_count = 0
+    zero_sens_count = 0
+    zero_spec_count = 0
 
     csv_col_names = [GRAM_NAME_FIELD, \
                 FREQ_FIELD, \
@@ -104,7 +107,6 @@ class FeatureSelector:
     def statistics(self) -> None:
         print('Printing statistics')
         print(f'Number of selected grams [{self.selected}]')
-        print(f'Threshold set to [{self.threshold}]')
 
     def dump_info(self) -> None:
         df = pd.DataFrame(data = self.features_info, columns = self.csv_col_names)
@@ -164,10 +166,6 @@ class FeatureSelector:
         return (2 * precision * recall) / (precision + recall)
 
     def _select_features(self, grams: dict) -> None:
-        self.zero_ppv_count = 0
-        self.zero_npv_count = 0
-        self.zero_sens_count = 0
-        self.zero_spec_count = 0
         gram_and_corr = []
         for elem in grams.items():
             total = elem[1][0]
@@ -222,9 +220,9 @@ class FlexibleGramExtractor:
     selection_done = False
     gram_space = set()
 
-    def __init__(self, paths, gram_size, requested_grams, threshold) -> None:
+    def __init__(self, paths, gram_size, requested_grams) -> None:
         self.fe = FeatureExtractor(paths)
-        self.fs = FeatureSelector(gram_size, requested_grams, threshold)
+        self.fs = FeatureSelector(gram_size, requested_grams)
 
     def extract(self) -> None:
         self.fe.extract(self._prep, self._extract_features)
@@ -232,13 +230,10 @@ class FlexibleGramExtractor:
     def export(self, path: str) -> None:
         self.fe.export(path)
 
-    def _prep(self, chunks, num_chunks) -> None:
-        if self.selection_done == False:
-            self.gram_space = self.fs.select(chunks, num_chunks)
+    def _prep(self, org_df) -> None:
+        if not self.selection_done:
+            self.gram_space = self.fs.select(org_df)
             self.selection_done = True
-
-    def _extract_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        return df.apply(_process_row, axis=1)
 
     def _process_row(self, row: pd.Series) -> pd.Series:
         url = row["url"]
@@ -250,13 +245,17 @@ class FlexibleGramExtractor:
         for elem in self.gram_space:
             features.update({elem:0})
         url_len = len(url)
-        if url_len >= self.gram_size:
-            for i in range(url_len - self.gram_size):
-                key = url[i : i + self.gram_size]
+        if url_len >= self.fs.gram_size:
+            for i in range(url_len - self.fs.gram_size):
+                key = url[i : i + self.fs.gram_size]
                 if key in self.gram_space:
                     features[key] = 1
 
         return pd.Series(features)
+
+    def _extract_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        return df.apply(self._process_row, axis=1)
+
 
 class BigramExtractor:
     fe: FeatureExtractor
@@ -290,7 +289,7 @@ class BigramExtractor:
 
         return pd.Series(features)
 
-    def _bigram_extract(self, url: str) -> List[int]:
+    def _bigram_extract(self, url: str) -> list[int]:
         url_len = len(url)
         total_bigrams = url_len - 1
         presence = [0] * (CHAR_SPACE_LEN**2)
@@ -298,3 +297,5 @@ class BigramExtractor:
         for i in range(total_bigrams):
             idx = CHAR_INDEX[url[i]] * CHAR_SPACE_LEN + CHAR_INDEX[url[i + 1]]
             presence[idx] = 1
+
+        return presence

@@ -14,6 +14,10 @@ class Graph():
         self.title = title
         self.x_label = x_label
         self.y_label = y_label
+        
+    def config(self, x, y):
+        """Method to implement the data transformation of the graph"""
+        pass
 
     def render(self, override_show: bool = False):
         """

@@ -1,10 +1,13 @@
 
 from matplotlib.pylab import PCG64
 import numpy as np
+import pandas as pd
 
 from graphs.bar import BarGraph
 from graphs.comparison import Comparison
-from graphs.histogram import Histogram
+from graphs.df_graph import DFGraph
+from graphs.histogram import HistogramGraph
+from graphs.scatter import ScatterGraph
 
 
 def main():
@@ -18,19 +21,36 @@ def main():
 
     # Graphs initialization
     graph = BarGraph("Teste Bar", "letras", "numeros")
-    hist = Histogram("Teste Hist", "valores", "freq")
+    hist = HistogramGraph("Teste Hist", "valores", "freq")
+    scat = ScatterGraph("Teste Scatter", "letras", "numeros")
 
     # Graphs configuration
     graph.config(categories, data)
     hist.config(hist_data)
+    scat.config(categories, data)
 
     # Graphs rendering
     graph.render()
     hist.render()
+    scat.render()
 
     # Comparison between graphs
     comp = Comparison()
     comp.render([graph, hist])
+
+    df = pd.read_csv("features_info_3.csv")
+    df_graph = DFGraph(
+        df=df,
+        graph=ScatterGraph(
+            "titulo",
+            "gram",
+            "freq"
+        ),
+        x_label="gram_names", 
+        y_label="frequency"
+    )
+
+    df_graph.render()
 
 if __name__ == "__main__":
     main()

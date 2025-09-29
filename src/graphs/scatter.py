@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from graphs.graph import Graph
 
 
-class BarGraph(Graph):
-    """Simple implementation of a bar graph"""
+class ScatterGraph(Graph):
+    """Simple implementation of a scatter graph"""
 
     def config(self, categories: list, data: list):
         """Method to set the necessary arguments for rendering
@@ -24,6 +24,12 @@ class BarGraph(Graph):
 
 
     def render(self, override_show: bool = False) -> None:
-        """Render a bar graph"""
-        plt.bar(self.categories, self.data)
+        """Render a scatter graph"""
+        plt.scatter(
+            [str(x) for x in self.categories],
+            self.data,
+            s=0.2,
+        )
+        plt.xticks([])
+
         super().render(override_show)
