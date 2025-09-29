@@ -9,6 +9,8 @@ from graphs.graph import Graph
 
 class ScatterGraph(Graph):
     """Simple implementation of a scatter graph"""
+    categories = []
+    data = []
 
     def config(self, categories: list, data: list):
         """Method to set the necessary arguments for rendering
@@ -28,8 +30,7 @@ class ScatterGraph(Graph):
         plt.scatter(
             [str(x) for x in self.categories],
             self.data,
-            s=0.2,
+            s=0.5,
         )
-        plt.xticks([])
-
+        
         super().render(override_show)

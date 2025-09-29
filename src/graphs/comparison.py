@@ -13,7 +13,7 @@ class Comparison():
         self.rows = rows
         self.columns = columns
 
-    def render(self, graphs:list[Graph]):
+    def render(self, graphs: list[Graph]):
         """Render a comparison between graphs"""
 
         for index in range(len(graphs)):
