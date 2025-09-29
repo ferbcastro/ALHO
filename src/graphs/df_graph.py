@@ -18,10 +18,8 @@ class DFGraph():
     def config(self, x_label, y_label):
         x_axis = self.df[x_label].to_list()
         y_axis = self.df[y_label].to_list()
-        print(x_axis)
-        print(y_axis)
+
         self.graph.config(x_axis, y_axis)
-    
-    def render(self):
-        self.graph.render()
-    
+
+    def render(self, override_show: bool = False):
+        self.graph.render(override_show)

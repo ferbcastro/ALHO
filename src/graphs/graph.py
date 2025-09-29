@@ -4,9 +4,10 @@
 import matplotlib.pyplot as plt
 
 class Graph():
+    """Basic implementation of a graph"""
 
     def __init__(
-        self, 
+        self,
         title: str,
         x_label: str,
         y_label: str
@@ -14,10 +15,9 @@ class Graph():
         self.title = title
         self.x_label = x_label
         self.y_label = y_label
-        
+
     def config(self, x, y):
         """Method to implement the data transformation of the graph"""
-        pass
 
     def render(self, override_show: bool = False):
         """

@@ -9,48 +9,43 @@ from graphs.df_graph import DFGraph
 from graphs.histogram import HistogramGraph
 from graphs.scatter import ScatterGraph
 
+def malign_begign_top_10(file_path: str) -> tuple:
+    df = pd.read_csv(file_path)
+    top10malignant = df.copy().sort_values(by=["frequency", "specificity"]).head(10)
+    top10benign = df.copy().sort_values(by="frequency").sort_values(by="specificity", ascending=False).head(10)
 
-def main():
-    # Data for bar graph
-    categories = ["a", "b", "c"]
-    data = [1, 2, 3]
-
-    # Data for histogram
-    x = np.random.Generator(PCG64())
-    hist_data = x.standard_normal(170)
-
-    # Graphs initialization
-    graph = BarGraph("Teste Bar", "letras", "numeros")
-    hist = HistogramGraph("Teste Hist", "valores", "freq")
-    scat = ScatterGraph("Teste Scatter", "letras", "numeros")
-
-    # Graphs configuration
-    graph.config(categories, data)
-    hist.config(hist_data)
-    scat.config(categories, data)
-
-    # Graphs rendering
-    graph.render()
-    hist.render()
-    scat.render()
-
-    # Comparison between graphs
-    comp = Comparison()
-    comp.render([graph, hist])
-
-    df = pd.read_csv("features_info_3.csv")
-    df_graph = DFGraph(
-        df=df,
+    top10_malignant_graph = DFGraph(
+        df=top10malignant,
         graph=ScatterGraph(
-            "titulo",
+            f"Top 10 {file_path} Maligns",
             "gram",
             "freq"
         ),
-        x_label="gram_names", 
+        x_label="gram_names",
+        y_label="frequency"
+    )
+    top10_benign_graph = DFGraph(
+        df=top10benign,
+        graph=ScatterGraph(
+            f"Top 10 {file_path} Benigns",
+            "gram",
+            "freq"
+        ),
+        x_label="gram_names",
         y_label="frequency"
     )
 
-    df_graph.render()
+    return top10_benign_graph, top10_malignant_graph
+
+def main():
+
+    # Comparison between graphs
+    comp = Comparison(rows=2, columns=2)
+
+    fourgram_top10benign, fourgram_top10malignant = malign_begign_top_10("features_info_4.csv")
+    threegram_top10benign, threegram_top10malignant = malign_begign_top_10("features_info_3.csv")
+
+    comp.render([fourgram_top10malignant, fourgram_top10benign, threegram_top10malignant, threegram_top10benign])
 
 if __name__ == "__main__":
     main()
