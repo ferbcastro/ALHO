@@ -73,6 +73,7 @@ class FeatureSelector:
     space: set
     label_phishing: int
     label_legitimate: int
+    seleted_only_on_freq: bool
 
     cols_1 = [GRAM_NAME_FIELD, \
             FREQ_FIELD, \
@@ -80,8 +81,7 @@ class FeatureSelector:
             PPV_FIELD, \
             NPV_FIELD, \
             SENS_FIELD, \
-            SPEC_FIELD, \
-            FSCORE_FIELD]
+            SPEC_FIELD]
 
     cols_2 = [GRAM_NAME_FIELD, FREQ_FIELD]
 
@@ -96,16 +96,18 @@ class FeatureSelector:
         self.space = set()
         self.features_info = []
 
-    def select(self, df : pd.DataFrame, l_phishing, l_legitimate) -> set:
+    def select(self, df : pd.DataFrame, l_phishing, l_legitimate, force_freq_sel) -> set:
         self.label_phishing = l_phishing
         self.label_legitimate = l_legitimate
         total_grams_dict = self._build_dictionary(df)
-        if self.num_not_phishing == 0 or self.num_phishing == 0:
+        if self.num_not_phishing == 0 or self.num_phishing == 0 or force_freq_sel:
             print('selecting based on frequency only...')
             self._select_features_on_freqs(total_grams_dict)
+            self.seleted_only_on_freq = True
         else:
             print('selecting based on frequency and ppv...')
             self._select_features_on_ppv_freqs(total_grams_dict)
+            self.seleted_only_on_freq = False
         return self.space
 
     def statistics(self) -> None:
@@ -113,7 +115,7 @@ class FeatureSelector:
         print(f'number of selected grams [{self.selected}]')
 
     def dump_info(self, name : str) -> None:
-        if self.num_phishing == 0 or self.num_not_phishing == 0:
+        if self.seleted_only_on_freq:
             df = pd.DataFrame(data = self.features_info, columns = self.cols_2)
         else:
             df = pd.DataFrame(data = self.features_info, columns = self.cols_1)
@@ -145,7 +147,7 @@ class FeatureSelector:
                     continue
                 if key not in aux_set:
                     if key not in dct:
-                        dct.update({key : [1, 0]})
+                        dct.update({key : [0, 0]})
                     dct[key][0] += 1
                     aux_set.add(key)
                     if label == self.label_legitimate:
@@ -182,10 +184,16 @@ class FeatureSelector:
         gram_and_corr = []
         for elem in grams.items():
             total = elem[1][0]
-            present_not_phishing = elem[1][1]
-            present_phishing = total - present_not_phishing
-            not_present_not_phishing = self.num_not_phishing - present_not_phishing
-            not_present_phishing = self.num_phishing - present_phishing
+            fp = present_not_phishing = elem[1][1]
+            tp = present_phishing = total - present_not_phishing
+            tn = not_present_not_phishing = self.num_not_phishing - present_not_phishing
+            fn = not_present_phishing = self.num_phishing - present_phishing
+
+            # print(not_present_not_phishing, not_present_phishing, elem)
+
+            if ((tp+fp) == 0 or (tp+fn) == 0 or (tn+fp) == 0 or (tn+fn) == 0):
+                print(f'Skiping n-gram {elem}')
+                continue
 
             corr = abs(self._calc_mcc(
                 present_phishing,
@@ -209,12 +217,10 @@ class FeatureSelector:
                 not_present_not_phishing,
                 present_not_phishing
             )
-            fscore = self._calc_fscore(
-                ppv,
-                sens
-            )
-            gram_and_corr.append([elem[0], total, corr, ppv, npv, sens, spec, fscore])
+            gram_and_corr.append([elem[0], total, corr, ppv, npv, sens, spec])
 
+        # gram_and_corr = sorted(gram_and_corr, key = lambda it : it[2], reverse = True)
+        # self.features_info = gram_and_corr[:self.requested]
         sorted_arr_ppv = sorted(gram_and_corr, key = lambda it : it[3], reverse = True)
         sorted_arr_ppv_sub = sorted_arr_ppv[:self.requested]
         sorted_arr_freq_sub = sorted(sorted_arr_ppv_sub, key = lambda it : it[1], reverse = True)
