@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from graphs.graph import Graph
 
 
-class Histogram(Graph):
+class HistogramGraph(Graph):
     """Simple implementation of a histogram"""
 
     def config(self, frequencies: list, bins: int =20):
