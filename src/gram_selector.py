@@ -11,7 +11,7 @@ USECOLS = ['URL', 'label']
 DTYPES = {'URL': 'string', 'label': 'int8'}
 
 size = 4
-request = 2046
+request = 4096
 l_phishing = int(input("Label if phishing: "))
 l_legitimate = 1 - l_phishing
 for path in sys.argv[1:]:
