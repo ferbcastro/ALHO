@@ -2,6 +2,7 @@
 
 # External libs
 import matplotlib.pyplot as plt
+import numpy as np
 
 # Internal modules
 from graphs.graph import Graph
@@ -22,8 +23,8 @@ class BarGraph(Graph):
         self.categories = categories
         self.data = data
 
-
-    def render(self, override_show: bool = False) -> None:
-        """Render a bar graph"""
+    def render(self):
         plt.bar(self.categories, self.data)
-        super().render(override_show)
+        super().render()
+
+

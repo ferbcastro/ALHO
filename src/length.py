@@ -7,7 +7,8 @@ if len(sys.argv) < 2:
 USECOLS = ['URL', 'label']
 
 phishing_label = int(input('enter phishing label: '))
-requested = 1024
+requested = 20
+requested_enum = range(requested)
 
 legitimate_label = 1 - phishing_label
 path = sys.argv[1]
@@ -15,13 +16,18 @@ df = pd.read_csv(path, usecols = USECOLS)
 df_p = df[df[USECOLS[1]] == phishing_label].copy(deep = True)
 df_l = df[df[USECOLS[1]] == legitimate_label].copy(deep = True)
 
-new_col = 'URL_LEN'
+col_len = 'URL_LEN'
+col_idx = 'IDX'
 
-df_p[new_col] = df_p[USECOLS[0]].apply(lambda elem : len(elem))
-df_l[new_col] = df_l[USECOLS[0]].apply(lambda elem : len(elem))
+df_p[col_len] = df_p[USECOLS[0]].apply(lambda elem : len(elem))
+df_l[col_len] = df_l[USECOLS[0]].apply(lambda elem : len(elem))
 
-df_p = df_p.sort_values(by = new_col, ascending = False)
-df_p[:requested].to_csv(f'sorted_len_phi_{path}', index = False)
+df_p = df_p.sort_values(by = col_len, ascending = False)
+df_p = df_p[:requested]
+df_p[col_idx] = range(requested)
+df_p.to_csv(f'phi_{path}', index = False)
 
-df_l = df_l.sort_values(by = new_col, ascending = False)
-df_l[:requested].to_csv(f'sorted_len_leg_{path}', index = False)
+df_l = df_l.sort_values(by = col_len, ascending = False)
+df_l = df_l[:requested]
+df_l[col_idx] = range(requested)
+df_l.to_csv(f'leg_{path}', index = False)

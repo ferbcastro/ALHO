@@ -219,12 +219,14 @@ class FeatureSelector:
             )
             gram_and_corr.append([elem[0], total, corr, ppv, npv, sens, spec])
 
-        # gram_and_corr = sorted(gram_and_corr, key = lambda it : it[2], reverse = True)
-        # self.features_info = gram_and_corr[:self.requested]
+        #gram_and_corr = sorted(gram_and_corr, key = lambda it : it[2], reverse = True)
+        #self.features_info = gram_and_corr[:self.requested]
         sorted_arr_ppv = sorted(gram_and_corr, key = lambda it : it[3], reverse = True)
-        sorted_arr_ppv_sub = sorted_arr_ppv[:self.requested]
-        sorted_arr_freq_sub = sorted(sorted_arr_ppv_sub, key = lambda it : it[1], reverse = True)
-        self.features_info = sorted_arr_freq_sub
+        sorted_arr_ppv_sub = sorted_arr_ppv[:self.requested * 2]
+        sorted_arr_ppv_npv = sorted(sorted_arr_ppv_sub, key = lambda it : it[4], reverse = True)
+        sorted_arr_ppv_npv_sub = sorted_arr_ppv_npv[:self.requested]
+        sorted_arr_freq_sub = sorted(sorted_arr_ppv_npv_sub, key = lambda it : it[1], reverse = True)
+        self.features_info = sorted_arr_freq_sub[:200]
         for elem in self.features_info:
             self.space.add(elem[0])
 

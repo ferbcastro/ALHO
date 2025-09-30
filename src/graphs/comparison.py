@@ -16,9 +16,15 @@ class Comparison():
     def render(self, graphs:list[Graph]):
         """Render a comparison between graphs"""
 
-        for index in range(len(graphs)):
-            plt.subplot(self.rows, self.columns, index+1)
+        fig, axes = plt.subplots(self.rows, self.columns, figsize=(12, 8))
 
-            graphs[index].render(True)
+        # transforma em vetor 1D (caso seja matriz 2D)
+        axes = axes.flatten()
 
-        plt.show()
+        for index, graph in enumerate(graphs):
+            plt.sca(axes[index])
+            graph.render()
+            plt.xticks([])
+
+        fig.tight_layout()
+

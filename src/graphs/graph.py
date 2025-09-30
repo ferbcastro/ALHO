@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 class Graph():
 
     def __init__(
-        self, 
+        self,
         title: str,
         x_label: str,
         y_label: str
@@ -14,12 +14,8 @@ class Graph():
         self.title = title
         self.x_label = x_label
         self.y_label = y_label
-        
-    def config(self, x, y):
-        """Method to implement the data transformation of the graph"""
-        pass
 
-    def render(self, override_show: bool = False):
+    def render(self):
         """
         Function that renders the graph
 
@@ -28,6 +24,3 @@ class Graph():
         plt.title(self.title)
         plt.xlabel(self.x_label)
         plt.ylabel(self.y_label)
-
-        if not override_show:
-            plt.show()
