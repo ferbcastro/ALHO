@@ -1,14 +1,4 @@
-from multiprocessing import Pool, cpu_count
-from urllib.parse import urlparse
-
-import math
-import re
-import string
 import pandas as pd
-
-CHAR_SPACE = string.printable[:-6] # printable characters except whitespaces
-CHAR_SPACE_LEN = len(CHAR_SPACE)
-CHAR_INDEX = {c: i for i, c in enumerate(CHAR_SPACE)}
 
 URL_FIELD = 'URL'
 LABEL_FIELD = 'label'
@@ -19,50 +9,11 @@ PPV_FIELD = 'ppv'
 NPV_FIELD = 'npv'
 SENS_FIELD = 'sensitivity'
 SPEC_FIELD = 'specificity'
-FSCORE_FIELD = 'fscore'
+#FSCORE_FIELD = 'fscore'
 
-# Strip scheme and characters outside CHAR_SPACE
-def strip_url(url: str) -> str:
-    url = "".join(char for char in url if char in CHAR_SPACE)
+cols_1 = [GRAM_NAME_FIELD, FREQ_FIELD, CORR_FIELD, PPV_FIELD, NPV_FIELD, SENS_FIELD, SPEC_FIELD]
 
-    if (scheme := urlparse(url).scheme):
-        url = re.sub(f"^{scheme}://", "", url)
-
-    return url
-
-class FeatureExtractor:
-    org_df: pd.DataFrame
-    mod_df: pd.DataFrame
-
-    def __init__(self, paths) -> None:
-        df1 = pd.read_csv(paths[0])
-        frames = [df1]
-        for path in paths[1:]:
-            tmp = pd.read_csv(path)
-            frames.append(tmp)
-
-        df = pd.concat(frames, ignore_index=True)
-        df['url'] = df['url'].apply(strip_url)
-        self.org_df = self.mod_df = df
-
-    def extract(self, prep_func, extraction_func) -> None:
-        n_procs = cpu_count()
-        chunk_size = math.ceil(self.org_df.shape[0] / n_procs)
-        chunks = []
-        for i in range(n_procs):
-            start_index = i * chunk_size
-            end_index = (i + 1) * chunk_size
-            df_chunk = self.org_df.iloc[start_index:end_index]
-            chunks.append(df_chunk)
-        n_chunks = n_procs
-        if prep_func:
-            prep_func(self.org_df) # any preprocessing needed
-        with Pool(n_chunks) as pool:
-            results = pool.map(extraction_func, chunks)
-        self.mod_df = pd.concat(results, ignore_index=True)
-
-    def export(self, path: str) -> None:
-        self.mod_df.to_csv(path, index=False)
+cols_2 = [GRAM_NAME_FIELD, FREQ_FIELD]
 
 class FeatureSelector:
     num_not_phishing: int
@@ -75,15 +26,7 @@ class FeatureSelector:
     label_legitimate: int
     seleted_only_on_freq: bool
 
-    cols_1 = [GRAM_NAME_FIELD, \
-            FREQ_FIELD, \
-            CORR_FIELD, \
-            PPV_FIELD, \
-            NPV_FIELD, \
-            SENS_FIELD, \
-            SPEC_FIELD]
 
-    cols_2 = [GRAM_NAME_FIELD, FREQ_FIELD]
 
     def __init__(self, gram_size, requested) -> None:
         assert gram_size > 0
@@ -229,89 +172,3 @@ class FeatureSelector:
         self.features_info = sorted_arr_freq_sub[:200]
         for elem in self.features_info:
             self.space.add(elem[0])
-
-class FlexibleGramExtractor:
-    fe: FeatureExtractor
-    fs: FeatureSelector
-    selection_done = False
-    gram_space = set()
-
-    def __init__(self, paths, gram_size, requested_grams) -> None:
-        self.fe = FeatureExtractor(paths)
-        self.fs = FeatureSelector(gram_size, requested_grams)
-
-    def extract(self) -> None:
-        self.fe.extract(self._prep, self._extract_features)
-
-    def export(self, path: str) -> None:
-        self.fe.export(path)
-
-    def _prep(self, org_df) -> None:
-        if not self.selection_done:
-            self.gram_space = self.fs.select(org_df)
-            self.selection_done = True
-
-    def _process_row(self, row: pd.Series) -> pd.Series:
-        url = row["url"]
-        features = {
-                "url"   : row["url"],
-                "label" : row["label"]
-                }
-
-        for elem in self.gram_space:
-            features.update({elem:0})
-        url_len = len(url)
-        if url_len >= self.fs.gram_size:
-            for i in range(url_len - self.fs.gram_size):
-                key = url[i : i + self.fs.gram_size]
-                if key in self.gram_space:
-                    features[key] = 1
-
-        return pd.Series(features)
-
-    def _extract_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        return df.apply(self._process_row, axis=1)
-
-
-class BigramExtractor:
-    fe: FeatureExtractor
-
-    def __init__(self, paths) -> None:
-        self.fe = FeatureExtractor(paths)
-
-    def extract(self) -> None:
-        self.fe.extract(None, self._extract_features)
-
-    def export(self, path: str) -> None:
-        self.fe.export(path)
-
-    def _extract_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        return df.apply(self._process_row, axis=1)
-
-    def _process_row(self, row: pd.Series) -> pd.Series:
-        url = row["url"]
-        features = {
-                "url"   : row["url"],
-                "label" : row["label"]
-                }
-
-        bigram_presence = self._bigram_extract(url)
-
-        for i, j in enumerate(bigram_presence):
-            idx1 = i // CHAR_SPACE_LEN
-            idx2 = i % CHAR_SPACE_LEN
-            big = CHAR_SPACE[idx1] + CHAR_SPACE[idx2]
-            features.update({big:j})
-
-        return pd.Series(features)
-
-    def _bigram_extract(self, url: str) -> list[int]:
-        url_len = len(url)
-        total_bigrams = url_len - 1
-        presence = [0] * (CHAR_SPACE_LEN**2)
-
-        for i in range(total_bigrams):
-            idx = CHAR_INDEX[url[i]] * CHAR_SPACE_LEN + CHAR_INDEX[url[i + 1]]
-            presence[idx] = 1
-
-        return presence
