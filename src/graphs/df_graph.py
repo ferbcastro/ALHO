@@ -8,12 +8,9 @@ class DFGraph():
         self,
         df: DataFrame,
         graph: Graph,
-        x_label: str,
-        y_label: str
     ):
         self.df = df
         self.graph = graph
-        self.config(x_label, y_label)
 
     def config(self, x_label, y_label):
         x_axis = self.df[x_label].to_list()

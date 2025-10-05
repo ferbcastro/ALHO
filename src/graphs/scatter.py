@@ -28,8 +28,12 @@ class ScatterGraph(Graph):
     def render(self, override_show: bool = False) -> None:
         """Render a scatter graph"""
         plt.scatter(
-            [str(x) for x in self.categories],
-            self.data
+            self.categories,
+            self.data,
+            s=20,
         )
-        
+        plt.ylim(0, 1)
+        plt.xlim(0, 2)
+
         super().render(override_show)
+

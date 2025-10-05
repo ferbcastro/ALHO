@@ -29,5 +29,5 @@ class Graph():
         plt.xlabel(self.x_label)
         plt.ylabel(self.y_label)
 
-        if not override_show:
+        if override_show:
             plt.show()
