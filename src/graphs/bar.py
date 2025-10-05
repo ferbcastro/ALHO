@@ -23,8 +23,6 @@ class BarGraph(Graph):
         self.categories = categories
         self.data = data
 
-    def render(self):
+    def render(self, override_show: bool = False):
         plt.bar(self.categories, self.data)
-        super().render()
-
-
+        super().render(override_show)
