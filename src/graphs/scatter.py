@@ -29,8 +29,7 @@ class ScatterGraph(Graph):
         """Render a scatter graph"""
         plt.scatter(
             [str(x) for x in self.categories],
-            self.data,
-            s=0.5,
+            self.data
         )
         
         super().render(override_show)

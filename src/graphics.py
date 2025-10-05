@@ -45,7 +45,7 @@ def main():
     fourgram_top10benign, fourgram_top10malignant = malign_begign_top_10("features_info_4.csv")
     threegram_top10benign, threegram_top10malignant = malign_begign_top_10("features_info_3.csv")
 
-    comp.render([fourgram_top10malignant, fourgram_top10benign, threegram_top10malignant, threegram_top10benign])
+    comp.export([fourgram_top10malignant, fourgram_top10benign, threegram_top10malignant, threegram_top10benign])
 
 if __name__ == "__main__":
     main()
