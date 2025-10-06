@@ -1,60 +1,62 @@
 from multiprocessing import Pool, cpu_count
 import pandas as pd
 
-def extract(self, prep_func, extraction_func) -> None:
-        n_procs = cpu_count()
-        chunk_size = math.ceil(self.org_df.shape[0] / n_procs)
-        chunks = []
-        for i in range(n_procs):
-            start_index = i * chunk_size
-            end_index = (i + 1) * chunk_size
-            df_chunk = self.org_df.iloc[start_index:end_index]
-            chunks.append(df_chunk)
-        n_chunks = n_procs
-        if prep_func:
-            prep_func(self.org_df) # any preprocessing needed
-        with Pool(n_chunks) as pool:
-            results = pool.map(extraction_func, chunks)
-        self.mod_df = pd.concat(results, ignore_index=True)
+import utils.wrappers as wp
+import utils.urls as ul
 
-class FlexibleGramExtractor:
-    fe: FeatureExtractor
-    fs: FeatureSelector
-    selection_done = False
-    gram_space = set()
+import math
 
-    def __init__(self, paths, gram_size, requested_grams) -> None:
-        self.fe = FeatureExtractor(paths)
-        self.fs = FeatureSelector(gram_size, requested_grams)
+URL_FIELD = 'URL'
+LABEL_FIELD = 'label'
+GRAM_NAME_FIELD = 'gram_names'
 
-    def extract(self) -> None:
-        self.fe.extract(self._prep, self._extract_features)
+ngrams = set()
+gram_size = 4
 
-    def export(self, path: str) -> None:
-        self.fe.export(path)
+def extract(grampath, paths) -> pd.DataFrame:
+    df = wp.concat(paths)
 
-    def _prep(self, org_df) -> None:
-        if not self.selection_done:
-            self.gram_space = self.fs.select(org_df)
-            self.selection_done = True
+    read_features(grampath)
 
-    def _process_row(self, row: pd.Series) -> pd.Series:
-        url = row["url"]
-        features = {
-                "url"   : row["url"],
-                "label" : row["label"]
-                }
+    n_procs = cpu_count()
+    chunk_size = math.ceil(df.shape[0] / n_procs)
+    chunks = []
+    for i in range(n_procs):
+        start_index = i * chunk_size
+        end_index = (i + 1) * chunk_size
+        chunk = df.iloc[start_index:end_index]
+        chunks.append(chunk)
 
-        for elem in self.gram_space:
-            features.update({elem:0})
-        url_len = len(url)
-        if url_len >= self.fs.gram_size:
-            for i in range(url_len - self.fs.gram_size):
-                key = url[i : i + self.fs.gram_size]
-                if key in self.gram_space:
-                    features[key] = 1
+    with Pool(n_procs) as pool:
+        results = pool.map(flex_extract, chunks)
 
-        return pd.Series(features)
+    return pd.concat(results, ignore_index = True)
 
-    def _extract_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        return df.apply(self._process_row, axis=1)
+def process_row(row: pd.Series) -> pd.Series:
+    global ngrams
+    global gram_size
+    url = row[URL_FIELD]
+    features = {
+            "url"   : row[URL_FIELD],
+            "label" : row[LABEL_FIELD]
+            }
+
+    for elem in ngrams:
+        features.update({elem:0})
+    url_len = len(url)
+    if url_len >= gram_size:
+        for i in range(url_len - gram_size):
+            key = url[i : i + gram_size]
+            if key in ngrams:
+                features[key] = 1
+
+    return pd.Series(features)
+
+def flex_extract(df: pd.DataFrame) -> pd.DataFrame:
+    return df.apply(process_row, axis = 1)
+
+def read_features(path):
+    global ngrams
+    df = pd.read_csv(path, usecols=[GRAM_NAME_FIELD])
+    ngrams_list = df[GRAM_NAME_FIELD].to_list()
+    ngrams = set(ngrams_list)

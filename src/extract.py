@@ -1,5 +1,4 @@
 from extraction.bigram_extractor import extract
-# from extraction.flex_extractor import extract
 from utils.wrappers import export
 import sys
 
