@@ -27,7 +27,7 @@ CSV_SOURCE = sys.argv[1]
 def setup():
     """Sets up the environment by reading the CSV file and preparing the data."""
 
-    df = pd.read_csv(CSV_SOURCE).head(6)
+    df = pd.read_csv(CSV_SOURCE)
 
     df = df.drop('url', axis=1)
 
