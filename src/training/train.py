@@ -14,9 +14,7 @@ from sklearn.preprocessing import StandardScaler
 current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.dirname(current_dir)
 sys.path.append(src_dir)
-from models.autoencoder import UndercompleteAE
-
-
+from models.autoencoder import UndercompleteAE 
 
 if len(sys.argv) < 2:
     print("Usage: python3 train.py path_to_csv")
@@ -30,11 +28,11 @@ def setup():
     df = pd.read_csv(CSV_SOURCE)
 
     df = df.drop('url', axis=1)
+    remaining_labels = df.pop('label')
 
     X = df
 
-    return X
-
+    return X, remaining_labels
 
 def train(X: pd.DataFrame):
     """Trains the autoencoder on the provided data."""
@@ -75,26 +73,30 @@ def train(X: pd.DataFrame):
 
     encoded_data = model.encoder(X_tensor).detach().numpy()
 
-    return encoded_data
-    
+    return encoded_data, model
 
-
-def export(encoded_data, filename="encodedData.csv") -> None:
+def export_data(encoded_data, filename="encodedData.csv", labels: pd.DataFrame=None) -> None:
     """Exports the encoded data to a CSV file."""
 
     encoded_df = pd.DataFrame(encoded_data)
+    
+    if labels is not None:
+        encoded_df = encoded_df.join(labels)
+    
     encoded_df.to_csv(filename, index=False)
+
     print(f"Encoded data exported to {filename}")
 
 
 def main():
     """Main function to train the autoencoder and export encoded data."""
 
-    X = setup()
+    X, labels = setup()
 
-    encoded_data = train(X)
+    encoded_data, model = train(X)
 
-    export(encoded_data)
+    export_data(encoded_data, labels=labels)
+    model.export()
 
 if __name__ == "__main__":
     main()
