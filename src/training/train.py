@@ -42,7 +42,7 @@ def train(X: pd.DataFrame, batch_size: int = 32):
     """Trains the autoencoder on the provided data using batch processing."""
 
     # Converting to PyTorch tensor
-    X_tensor = torch.FloatTensor(X_scaled)
+    X_tensor = torch.tensor(X.to_numpy(), dtype=torch.float32)
 
     # Create dataset and dataloader for batch processing
     dataloader = DataLoader(
