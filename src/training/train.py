@@ -55,8 +55,8 @@ def train(X: pd.DataFrame, batch_size: int = 32):
     torch.manual_seed(42)
 
     input_size = X.shape[1]  # Number of input features
-    encoding_dim = 3  # Desired number of output dimensions
-    model = UndercompleteAE(input_size, encoding_dim)
+    # encoding_dim = 3  # Desired number of output dimensions
+    model = UndercompleteAE(input_dim = input_size)
 
     # Loss function and optimizer
     criterion = BCELoss()
