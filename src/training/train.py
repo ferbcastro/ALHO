@@ -1,4 +1,4 @@
-''' Train an undercomplete autoencoder on the provided CSV data 
+''' Train an undercomplete autoencoder on the provided CSV data
     and export the encoded data to a new CSV file.
 '''
 
@@ -6,8 +6,6 @@ import sys
 import os
 
 import pandas as pd
-
-from sklearn.preprocessing import StandardScaler
 
 import torch
 from torch.nn import MSELoss
@@ -17,7 +15,7 @@ from torch.utils.data import DataLoader, TensorDataset
 current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.dirname(current_dir)
 sys.path.append(src_dir)
-from models.autoencoder import UndercompleteAE 
+from models.autoencoder import UndercompleteAE
 
 if len(sys.argv) < 2:
     print("Usage: python3 train.py path_to_csv [batch_size]")
@@ -42,9 +40,6 @@ def setup():
 
 def train(X: pd.DataFrame, batch_size: int = 32):
     """Trains the autoencoder on the provided data using batch processing."""
-
-    # Normalizing Data
-    X_scaled = StandardScaler().fit_transform(X)
 
     # Converting to PyTorch tensor
     X_tensor = torch.FloatTensor(X_scaled)
@@ -72,10 +67,10 @@ def train(X: pd.DataFrame, batch_size: int = 32):
     for epoch in range(num_epochs):
         epoch_loss = 0.0
         num_batches = 0
-        
+
         for batch_data in dataloader:
             batch_X = batch_data[0]
-            
+
             # Forward pass
             outputs = model(batch_X)
             loss = criterion(outputs, batch_X)
