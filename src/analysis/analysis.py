@@ -1,8 +1,27 @@
 import torch
 import torch.nn as nn
+import pandas as pd
+import numpy as np 
 
 from models.autoencoder import UndercompleteAE 
 from torch.utils.data import DataLoader, TensorDataset
+
+def load_csv_data(csv_path):
+    df = pd.read_csv(csv_path)
+
+    if 'url' not in df.columns or 'label' not in df.columns:
+        print("CSV error read")
+
+    feature_columns = [col for col in df.columns if col not in ['url','label']]
+
+    if len(feature_columns) == 0:
+        print("Don't have columns")
+
+    features = df[feature_columns].values
+    features_tensor = torch.tensor(features, dtype=tyrch.float32)
+
+    return features_tensor
+
 
 def evaluate(model, dataloader, device):
     model.eval()
@@ -28,9 +47,10 @@ if __name__ == "__main__":
 
     model = UndercompleteAE(input_dim=22, latent_dim=2048).to(device)
     model.load_state_dict(torch.load("./UCAE_state", map_location=device))
+    print("Modelo carregado")
 
     # aqui vai o path do arquivo teste
-    test_path = ".////"
+    test_path = "./"
 
     X_test = torch.load(test_path)
     test_dataset = TensorDataset(X_test)
