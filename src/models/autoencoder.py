@@ -8,29 +8,30 @@ will make fine tunning easier
 """
 
 class Encoder(nn.Module):
-    def __init__(self, input_dim=9860, latent_dim=1024):
+    def __init__(self, input_dim=9860, latent_dim=2450):
         super().__init__()
         self.layers = nn.Sequential(
                 nn.Linear(input_dim, 4930),
                 nn.ReLU(), 
-                nn.Linear(4930, 2450),
+                nn.Linear(4930, latent_dim),
                 nn.ReLU(), 
-                nn.Linear(2450, latent_dim)
+                # nn.Linear(2450, latent_dim)
                 )
 
     def forward(self, x):
         return self.layers(x)
 
 class Decoder(nn.Module):
-    def __init__(self, output_dim=9860, latent_dim=1024):
+    def __init__(self, output_dim=9860, latent_dim=2450):
         super().__init__()
         self.layers = nn.Sequential(
-                nn.Linear(latent_dim, 2450),
-                nn.ReLU(),
-                nn.Linear(2450, 4930),
+                nn.Linear(latent_dim, 4930),
                 nn.ReLU(),
                 nn.Linear(4930, output_dim),
-                nn.Sigmoid() 
+                nn.Sigmoid()
+                # nn.ReLU(),
+                # nn.Linear(4930, output_dim),
+                # nn.Sigmoid() 
                 )
 
     def forward(self, x):

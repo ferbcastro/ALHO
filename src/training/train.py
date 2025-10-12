@@ -8,6 +8,7 @@ import os
 import pandas as pd
 
 import torch
+from datetime import datetime
 from torch.nn import BCELoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset
@@ -35,14 +36,18 @@ def setup():
     remaining_labels = df.pop('label')
 
     X = df
+        
+    print('Dataset loaded')
 
     return X, remaining_labels
 
 def train(X: pd.DataFrame, batch_size: int = 32):
     """Trains the autoencoder on the provided data using batch processing."""
 
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
     # Converting to PyTorch tensor
-    X_tensor = torch.tensor(X.to_numpy(), dtype=torch.float32)
+    X_tensor = torch.tensor(X.to_numpy(), dtype=torch.float32).to(device)
 
     # Create dataset and dataloader for batch processing
     dataloader = DataLoader(
@@ -56,7 +61,7 @@ def train(X: pd.DataFrame, batch_size: int = 32):
 
     input_size = X.shape[1]  # Number of input features
     # encoding_dim = 3  # Desired number of output dimensions
-    model = UndercompleteAE(input_dim = input_size)
+    model = UndercompleteAE(input_dim=input_size).to(device)
 
     # Loss function and optimizer
     criterion = BCELoss()
@@ -84,6 +89,7 @@ def train(X: pd.DataFrame, batch_size: int = 32):
             num_batches += 1
 
         avg_loss = epoch_loss / num_batches
+        print(datetime.now().strftime("%H:%M:%S"))
         print(f'Epoch [{epoch + 1}/{num_epochs}], Average Loss: {avg_loss:.4f}')
 
     # Generate encoded data for the entire dataset
