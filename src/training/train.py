@@ -54,7 +54,7 @@ def train(X: pd.DataFrame, batch_size: int = 32):
         TensorDataset(X_tensor),
         batch_size=batch_size,
         shuffle=True
-)
+    )
 
     # Setting random seed for reproducibility
     torch.manual_seed(42)
